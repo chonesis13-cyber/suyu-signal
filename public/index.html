@@ -66,4 +66,194 @@
       position: fixed; bottom: 0; left: 0; right: 0; z-index: 10;
       background: rgba(13,13,13,0.95); backdrop-filter: blur(10px);
       border-top: 1px solid rgba(255,255,255,0.08);
-      padding: 16px
+      padding: 16px 20px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .panel .left .name { font-size: 14px; font-weight: 700; color: #fff; }
+    .panel .left .addr { font-size: 11px; color: #666; margin-top: 2px; }
+    .panel .right { text-align: right; }
+    .panel .right .status { font-size: 12px; font-weight: 700; color: #555; }
+    .panel .right .status.green { color: #00e676; }
+    .panel .right .status.red   { color: #ff1744; }
+    .panel .right .updated { font-size: 10px; color: #444; margin-top: 2px; }
+
+    .toast {
+      position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
+      background: rgba(255,23,68,0.15); border: 1px solid rgba(255,23,68,0.4);
+      border-radius: 20px; padding: 8px 18px;
+      font-size: 12px; color: #ff5252;
+      display: none; z-index: 20; white-space: nowrap;
+    }
+
+    /* 위치 찾는 중 토스트 */
+    .toast-info {
+      position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
+      background: rgba(41,121,255,0.15); border: 1px solid rgba(41,121,255,0.4);
+      border-radius: 20px; padding: 8px 18px;
+      font-size: 12px; color: #82b1ff;
+      display: none; z-index: 20; white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="dot" id="dot"></div>
+    <h1>수유역 신호등</h1>
+    <span class="sub" id="updated">연결 중...</span>
+  </div>
+
+  <div id="map"></div>
+
+  <!-- 현재위치 버튼 -->
+  <button class="btn-location" id="btn-location" title="현재위치">📍</button>
+
+  <div class="panel">
+    <div class="left">
+      <div class="name" id="panel-name">교차로 정보 로딩 중</div>
+      <div class="addr">서울시 강북구 수유동</div>
+    </div>
+    <div class="right">
+      <div class="status" id="panel-status">--</div>
+      <div class="updated" id="panel-time">--:--:--</div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <div class="toast-info" id="toast-info"></div>
+
+  <script>
+    const API_URL = "https://suyu-signal.onrender.com/api/signal";
+    const POLL_MS = 2000;
+    const CENTER  = { lat: 37.6489, lng: 127.0277 };
+
+    // 카카오맵 초기화
+    const map = new kakao.maps.Map(document.getElementById("map"), {
+      center: new kakao.maps.LatLng(CENTER.lat, CENTER.lng),
+      level: 3
+    });
+
+    // UI 요소
+    const dotEl       = document.getElementById("dot");
+    const updatedEl   = document.getElementById("updated");
+    const panelName   = document.getElementById("panel-name");
+    const panelStatus = document.getElementById("panel-status");
+    const panelTime   = document.getElementById("panel-time");
+    const toastEl     = document.getElementById("toast");
+    const toastInfo   = document.getElementById("toast-info");
+    const btnLocation = document.getElementById("btn-location");
+
+    let signalOverlay  = null;
+    let locationOverlay = null;
+    let watchId        = null;
+
+    // ── 토스트 ──────────────────────────────────
+    function showToast(msg) {
+      toastEl.textContent = "⚠️ " + msg;
+      toastEl.style.display = "block";
+      setTimeout(() => toastEl.style.display = "none", 4000);
+    }
+    function showInfo(msg) {
+      toastInfo.textContent = msg;
+      toastInfo.style.display = "block";
+      setTimeout(() => toastInfo.style.display = "none", 3000);
+    }
+
+    // ── 신호등 마커 ─────────────────────────────
+    function updateMarker(lat, lng, sec, isGreen, name) {
+      const color = isGreen ? "green" : "red";
+      const emoji = isGreen ? "🟢" : "🔴";
+      const content = `
+        <div class="signal-bubble ${color}">
+          <span class="emoji">${emoji}</span>
+          <div class="sec">${sec}</div>
+          <div class="label">초 남음</div>
+        </div>`;
+
+      if (signalOverlay) signalOverlay.setMap(null);
+      signalOverlay = new kakao.maps.CustomOverlay({
+        position: new kakao.maps.LatLng(lat, lng),
+        content: content,
+        yAnchor: 1.3
+      });
+      signalOverlay.setMap(map);
+
+      dotEl.className         = "dot " + color;
+      panelName.textContent   = name;
+      panelStatus.textContent = isGreen ? "🟢 녹색 신호" : "🔴 적색 신호";
+      panelStatus.className   = "status " + color;
+      panelTime.textContent   = new Date().toLocaleTimeString("ko-KR", { hour12: false });
+      updatedEl.textContent   = new Date().toLocaleTimeString("ko-KR", { hour12: false }) + " 갱신";
+    }
+
+    // ── 현재위치 마커 ────────────────────────────
+    function updateMyLocation(lat, lng) {
+      const content = `<div class="my-location"></div>`;
+      if (locationOverlay) locationOverlay.setMap(null);
+      locationOverlay = new kakao.maps.CustomOverlay({
+        position: new kakao.maps.LatLng(lat, lng),
+        content: content,
+        yAnchor: 0.5
+      });
+      locationOverlay.setMap(map);
+    }
+
+    // ── 현재위치 버튼 ────────────────────────────
+    btnLocation.addEventListener("click", () => {
+      if (!navigator.geolocation) {
+        showToast("이 브라우저는 위치 기능을 지원하지 않아요");
+        return;
+      }
+
+      showInfo("📍 현재 위치를 찾는 중...");
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          updateMyLocation(lat, lng);
+          map.setCenter(new kakao.maps.LatLng(lat, lng));
+          map.setLevel(3);
+          showInfo("📍 현재 위치로 이동했어요");
+        },
+        (err) => {
+          showToast("위치 권한을 허용해주세요");
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    });
+
+    // ── 신호 데이터 갱신 ─────────────────────────
+    let errCount = 0;
+
+    async function updateSignal() {
+      try {
+        const res = await fetch(API_URL);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!data?.SptTrafficLghtResidTime?.row?.length) throw new Error("데이터 없음");
+
+        const row     = data.SptTrafficLghtResidTime.row[0];
+        const sec     = Number(row.RESID_TIME);
+        const isGreen = row.LGHT_COL_CD == "1";
+        const name    = row.ITRSC_NM || row.INTRSEC_NM || "수유역 교차로";
+        const lat     = row.LAT ? Number(row.LAT) : CENTER.lat;
+        const lng     = row.LNG ? Number(row.LNG) : CENTER.lng;
+
+        updateMarker(lat, lng, sec, isGreen, name);
+        errCount = 0;
+
+      } catch (err) {
+        errCount++;
+        if (errCount === 1) showToast(err.message);
+        dotEl.className       = "dot";
+        updatedEl.textContent = "수신 실패";
+      } finally {
+        setTimeout(updateSignal, POLL_MS);
+      }
+    }
+
+    updateSignal();
+  </script>
+</body>
+</html>
