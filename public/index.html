@@ -3,128 +3,198 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>수유역 신호등</title>
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+KR:wght@300;700&display=swap" rel="stylesheet" />
+  <title>수유역 신호등 지도</title>
+  <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=bd28b2384c551798f2ab4cd0b9f511a1"></script>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --green: #00e676; --red: #ff1744;
-      --bg: #0d0d0d; --card: #161616; --border: #2a2a2a;
-      --text: #e0e0e0; --muted: #555;
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; }
+
+    #map { width: 100vw; height: 100vh; }
+
+    /* 상단 헤더 */
+    .header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+      background: rgba(13,13,13,0.92);
+      backdrop-filter: blur(10px);
+      padding: 14px 20px;
+      display: flex; align-items: center; gap: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
     }
-    body { background: var(--bg); color: var(--text); font-family: 'Noto Sans KR', sans-serif;
-      min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
-    .card { background: var(--card); border: 1px solid var(--border); border-radius: 24px;
-      padding: 48px 40px 40px; width: 100%; max-width: 420px; text-align: center;
-      box-shadow: 0 24px 60px rgba(0,0,0,0.6); transition: box-shadow 0.6s; }
-    .card.glow-green { box-shadow: 0 0 60px rgba(0,230,118,0.35), 0 24px 60px rgba(0,0,0,0.6); }
-    .card.glow-red   { box-shadow: 0 0 60px rgba(255,23,68,0.35),  0 24px 60px rgba(0,0,0,0.6); }
-    .light { width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 28px;
-      background: var(--muted); display: flex; align-items: center; justify-content: center; font-size: 32px;
-      transition: background 0.5s, box-shadow 0.5s; }
-    .light.green { background: var(--green); box-shadow: 0 0 40px rgba(0,230,118,0.4);
-      animation: pg 1.6s ease-in-out infinite; }
-    .light.red   { background: var(--red);   box-shadow: 0 0 40px rgba(255,23,68,0.4);
-      animation: pr 1.6s ease-in-out infinite; }
-    @keyframes pg { 0%,100%{box-shadow:0 0 30px rgba(0,230,118,0.35)} 50%{box-shadow:0 0 60px rgba(0,230,118,0.7)} }
-    @keyframes pr { 0%,100%{box-shadow:0 0 30px rgba(255,23,68,0.35)} 50%{box-shadow:0 0 60px rgba(255,23,68,0.7)} }
-    .location { font-size: 12px; letter-spacing: 4px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
-    .title { font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 3px; margin-bottom: 32px; }
-    #status { font-size: 14px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
-      margin-bottom: 12px; min-height: 20px; transition: color 0.4s; color: var(--muted); }
-    #status.green { color: var(--green); }
-    #status.red   { color: var(--red); }
-    #timer { font-family: 'Bebas Neue', sans-serif; font-size: 100px; line-height: 1;
-      transition: color 0.4s; color: var(--muted); }
-    #timer.green { color: var(--green); text-shadow: 0 0 30px rgba(0,230,118,0.4); }
-    #timer.red   { color: var(--red);   text-shadow: 0 0 30px rgba(255,23,68,0.4); }
-    #unit { font-size: 18px; color: var(--muted); margin-bottom: 32px; }
-    .bar-wrap { background: var(--border); border-radius: 99px; height: 6px; overflow: hidden; margin-bottom: 32px; }
-    #bar { height: 100%; border-radius: 99px; width: 0%; transition: width 1.8s linear, background 0.4s; background: var(--muted); }
-    #bar.green { background: var(--green); }
-    #bar.red   { background: var(--red); }
-    hr { border: none; border-top: 1px solid var(--border); margin-bottom: 20px; }
-    .meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
-    #error { display: none; margin-top: 20px; background: rgba(255,23,68,0.1);
-      border: 1px solid rgba(255,23,68,0.3); border-radius: 10px; padding: 10px 16px;
-      font-size: 12px; color: var(--red); }
+    .header h1 { font-size: 16px; font-weight: 700; color: #fff; }
+    .header .dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: #555; animation: none;
+    }
+    .header .dot.green { background: #00e676; box-shadow: 0 0 8px #00e676; animation: blink 1.4s infinite; }
+    .header .dot.red   { background: #ff1744; box-shadow: 0 0 8px #ff1744; animation: blink 1.4s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    .header .sub { font-size: 12px; color: #888; margin-left: auto; }
+
+    /* 마커 커스텀 말풍선 */
+    .signal-bubble {
+      background: #1a1a1a;
+      border: 2px solid #333;
+      border-radius: 12px;
+      padding: 8px 12px;
+      text-align: center;
+      min-width: 70px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      position: relative;
+    }
+    .signal-bubble.green { border-color: #00e676; }
+    .signal-bubble.red   { border-color: #ff1744; }
+    .signal-bubble .emoji { font-size: 20px; display: block; margin-bottom: 2px; }
+    .signal-bubble .sec {
+      font-size: 22px; font-weight: 900; line-height: 1;
+      color: #fff;
+    }
+    .signal-bubble.green .sec { color: #00e676; }
+    .signal-bubble.red   .sec { color: #ff1744; }
+    .signal-bubble .label { font-size: 10px; color: #888; margin-top: 2px; }
+
+    /* 하단 정보 패널 */
+    .panel {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 10;
+      background: rgba(13,13,13,0.95);
+      backdrop-filter: blur(10px);
+      border-top: 1px solid rgba(255,255,255,0.08);
+      padding: 16px 20px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .panel .left .name { font-size: 14px; font-weight: 700; color: #fff; }
+    .panel .left .addr { font-size: 11px; color: #666; margin-top: 2px; }
+    .panel .right { text-align: right; }
+    .panel .right .status { font-size: 12px; font-weight: 700; color: #555; }
+    .panel .right .status.green { color: #00e676; }
+    .panel .right .status.red   { color: #ff1744; }
+    .panel .right .updated { font-size: 10px; color: #444; margin-top: 2px; }
+
+    /* 오류 토스트 */
+    .toast {
+      position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
+      background: rgba(255,23,68,0.15);
+      border: 1px solid rgba(255,23,68,0.4);
+      border-radius: 20px; padding: 8px 18px;
+      font-size: 12px; color: #ff5252;
+      display: none; z-index: 20;
+      white-space: nowrap;
+    }
   </style>
 </head>
 <body>
-  <div class="card" id="card">
-    <div class="light" id="light">🚦</div>
-    <p class="location">Seoul · Suyu Station</p>
-    <h1 class="title">실시간 신호 잔여시간</h1>
-    <p id="status">서버 연결 중...</p>
-    <div id="timer">--</div>
-    <div id="unit">초 남음</div>
-    <div class="bar-wrap"><div id="bar"></div></div>
-    <hr />
-    <div class="meta">
-      <span id="name">교차로 정보 로딩 중</span>
-      <span id="updated">--:--:--</span>
-    </div>
-    <div id="error"></div>
+
+  <div class="header">
+    <div class="dot" id="dot"></div>
+    <h1>수유역 신호등</h1>
+    <span class="sub" id="updated">연결 중...</span>
   </div>
+
+  <div id="map"></div>
+
+  <div class="panel">
+    <div class="left">
+      <div class="name" id="panel-name">교차로 정보 로딩 중</div>
+      <div class="addr">서울시 강북구 수유동</div>
+    </div>
+    <div class="right">
+      <div class="status" id="panel-status">--</div>
+      <div class="updated" id="panel-time">--:--:--</div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
 
   <script>
     const API_URL = "https://suyu-signal.onrender.com/api/signal";
     const POLL_MS = 2000;
-    const MAX_SEC = 120;
 
-    const card    = document.getElementById("card");
-    const light   = document.getElementById("light");
-    const status  = document.getElementById("status");
-    const timer   = document.getElementById("timer");
-    const bar     = document.getElementById("bar");
-    const nameEl  = document.getElementById("name");
-    const updated = document.getElementById("updated");
-    const errorEl = document.getElementById("error");
+    // 수유역 중심 좌표
+    const CENTER = { lat: 37.6489, lng: 127.0277 };
+
+    // 카카오맵 초기화
+    const mapContainer = document.getElementById("map");
+    const mapOption = {
+      center: new kakao.maps.LatLng(CENTER.lat, CENTER.lng),
+      level: 3
+    };
+    const map = new kakao.maps.Map(mapContainer, mapOption);
+
+    // UI 요소
+    const dotEl       = document.getElementById("dot");
+    const updatedEl   = document.getElementById("updated");
+    const panelName   = document.getElementById("panel-name");
+    const panelStatus = document.getElementById("panel-status");
+    const panelTime   = document.getElementById("panel-time");
+    const toastEl     = document.getElementById("toast");
+
+    // 마커 오버레이 저장
+    let overlay = null;
+
+    function showToast(msg) {
+      toastEl.textContent = "⚠️ " + msg;
+      toastEl.style.display = "block";
+      setTimeout(() => toastEl.style.display = "none", 4000);
+    }
+
+    function updateMarker(lat, lng, sec, isGreen, name) {
+      const color  = isGreen ? "green" : "red";
+      const emoji  = isGreen ? "🟢" : "🔴";
+
+      const content = `
+        <div class="signal-bubble ${color}">
+          <span class="emoji">${emoji}</span>
+          <div class="sec">${sec}</div>
+          <div class="label">초 남음</div>
+        </div>
+      `;
+
+      if (overlay) overlay.setMap(null);
+
+      overlay = new kakao.maps.CustomOverlay({
+        position: new kakao.maps.LatLng(lat, lng),
+        content: content,
+        yAnchor: 1.3
+      });
+      overlay.setMap(map);
+
+      // 헤더 dot
+      dotEl.className = "dot " + color;
+
+      // 하단 패널
+      panelName.textContent         = name;
+      panelStatus.textContent       = isGreen ? "🟢 녹색 신호" : "🔴 적색 신호";
+      panelStatus.className         = "status " + color;
+      panelTime.textContent         = new Date().toLocaleTimeString("ko-KR", { hour12: false });
+      updatedEl.textContent         = new Date().toLocaleTimeString("ko-KR", { hour12: false }) + " 갱신";
+    }
 
     let errCount = 0;
-
-    function setTheme(t) {
-      ["green","red","glow-green","glow-red"].forEach(c => {
-        card.classList.remove(c); light.classList.remove(c);
-        status.classList.remove(c); timer.classList.remove(c); bar.classList.remove(c);
-      });
-      if (t === "green") {
-        card.classList.add("glow-green"); light.classList.add("green"); light.textContent = "🟢";
-        status.classList.add("green"); timer.classList.add("green"); bar.classList.add("green");
-      } else if (t === "red") {
-        card.classList.add("glow-red"); light.classList.add("red"); light.textContent = "🔴";
-        status.classList.add("red"); timer.classList.add("red"); bar.classList.add("red");
-      } else {
-        light.textContent = "🚦";
-      }
-    }
 
     async function updateSignal() {
       try {
         const res = await fetch(API_URL);
-        if (!res.ok) throw new Error((await res.json().catch(()=>({}))).error || `HTTP ${res.status}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
+
         if (!data?.SptTrafficLghtResidTime?.row?.length) throw new Error("데이터 없음");
 
         const row     = data.SptTrafficLghtResidTime.row[0];
         const sec     = Number(row.RESID_TIME);
         const isGreen = row.LGHT_COL_CD == "1";
+        const name    = row.ITRSC_NM || row.INTRSEC_NM || "수유역 교차로";
 
-        setTheme(isGreen ? "green" : "red");
-        status.textContent  = isGreen ? "녹색 신호" : "적색 신호";
-        timer.textContent   = sec;
-        bar.style.width     = Math.min((sec / MAX_SEC) * 100, 100) + "%";
-        nameEl.textContent  = row.ITRSC_NM || row.INTRSEC_NM || "수유역 교차로";
-        updated.textContent = new Date().toLocaleTimeString("ko-KR", { hour12: false });
-        errorEl.style.display = "none";
+        // 좌표: 서울시 데이터에 좌표가 있으면 사용, 없으면 수유역 기본값
+        const lat = row.LAT ? Number(row.LAT) : CENTER.lat;
+        const lng = row.LNG ? Number(row.LNG) : CENTER.lng;
+
+        updateMarker(lat, lng, sec, isGreen, name);
         errCount = 0;
 
       } catch (err) {
         errCount++;
-        if (errCount >= 3) { setTheme("none"); timer.textContent = "--"; status.textContent = "수신 불가"; bar.style.width = "0%"; }
-        errorEl.style.display = "block";
-        errorEl.textContent = `⚠️ 연결 실패 (${errCount}회): ${err.message}`;
-        updated.textContent = new Date().toLocaleTimeString("ko-KR", { hour12: false });
+        if (errCount === 1) showToast(err.message);
+        dotEl.className = "dot";
+        updatedEl.textContent = "수신 실패";
       } finally {
         setTimeout(updateSignal, POLL_MS);
       }
