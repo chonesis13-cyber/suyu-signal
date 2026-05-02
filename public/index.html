@@ -4,203 +4,66 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>수유역 신호등 지도</title>
-  <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=bd28b2384c551798f2ab4cd0b9f511a1"></script>
+  <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=bd28b2384c551798f2ab4cd0b9f511a1&libraries=services"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; }
-
     #map { width: 100vw; height: 100vh; }
 
-    /* 상단 헤더 */
     .header {
       position: fixed; top: 0; left: 0; right: 0; z-index: 10;
-      background: rgba(13,13,13,0.92);
-      backdrop-filter: blur(10px);
-      padding: 14px 20px;
-      display: flex; align-items: center; gap: 10px;
+      background: rgba(13,13,13,0.92); backdrop-filter: blur(10px);
+      padding: 14px 20px; display: flex; align-items: center; gap: 10px;
       border-bottom: 1px solid rgba(255,255,255,0.08);
     }
     .header h1 { font-size: 16px; font-weight: 700; color: #fff; }
-    .header .dot {
-      width: 10px; height: 10px; border-radius: 50%;
-      background: #555; animation: none;
-    }
-    .header .dot.green { background: #00e676; box-shadow: 0 0 8px #00e676; animation: blink 1.4s infinite; }
-    .header .dot.red   { background: #ff1744; box-shadow: 0 0 8px #ff1744; animation: blink 1.4s infinite; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: #555; }
+    .dot.green { background: #00e676; box-shadow: 0 0 8px #00e676; animation: blink 1.4s infinite; }
+    .dot.red   { background: #ff1744; box-shadow: 0 0 8px #ff1744; animation: blink 1.4s infinite; }
     @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
     .header .sub { font-size: 12px; color: #888; margin-left: auto; }
 
-    /* 마커 커스텀 말풍선 */
+    /* 현재위치 버튼 */
+    .btn-location {
+      position: fixed; right: 16px; bottom: 100px; z-index: 10;
+      width: 48px; height: 48px; border-radius: 50%;
+      background: #1a1a1a; border: 1px solid #333;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; cursor: pointer;
+      transition: background 0.2s, transform 0.15s;
+    }
+    .btn-location:active { background: #333; transform: scale(0.93); }
+
     .signal-bubble {
-      background: #1a1a1a;
-      border: 2px solid #333;
-      border-radius: 12px;
-      padding: 8px 12px;
-      text-align: center;
-      min-width: 70px;
+      background: #1a1a1a; border: 2px solid #333;
+      border-radius: 12px; padding: 8px 12px;
+      text-align: center; min-width: 70px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-      position: relative;
     }
     .signal-bubble.green { border-color: #00e676; }
     .signal-bubble.red   { border-color: #ff1744; }
     .signal-bubble .emoji { font-size: 20px; display: block; margin-bottom: 2px; }
-    .signal-bubble .sec {
-      font-size: 22px; font-weight: 900; line-height: 1;
-      color: #fff;
-    }
+    .signal-bubble .sec  { font-size: 22px; font-weight: 900; line-height: 1; color: #fff; }
     .signal-bubble.green .sec { color: #00e676; }
     .signal-bubble.red   .sec { color: #ff1744; }
     .signal-bubble .label { font-size: 10px; color: #888; margin-top: 2px; }
 
-    /* 하단 정보 패널 */
+    /* 현재위치 마커 */
+    .my-location {
+      width: 20px; height: 20px; border-radius: 50%;
+      background: #2979ff;
+      border: 3px solid #fff;
+      box-shadow: 0 0 0 4px rgba(41,121,255,0.3);
+      animation: ripple 1.8s ease-out infinite;
+    }
+    @keyframes ripple {
+      0%   { box-shadow: 0 0 0 0 rgba(41,121,255,0.4); }
+      100% { box-shadow: 0 0 0 16px rgba(41,121,255,0); }
+    }
+
     .panel {
       position: fixed; bottom: 0; left: 0; right: 0; z-index: 10;
-      background: rgba(13,13,13,0.95);
-      backdrop-filter: blur(10px);
+      background: rgba(13,13,13,0.95); backdrop-filter: blur(10px);
       border-top: 1px solid rgba(255,255,255,0.08);
-      padding: 16px 20px;
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    .panel .left .name { font-size: 14px; font-weight: 700; color: #fff; }
-    .panel .left .addr { font-size: 11px; color: #666; margin-top: 2px; }
-    .panel .right { text-align: right; }
-    .panel .right .status { font-size: 12px; font-weight: 700; color: #555; }
-    .panel .right .status.green { color: #00e676; }
-    .panel .right .status.red   { color: #ff1744; }
-    .panel .right .updated { font-size: 10px; color: #444; margin-top: 2px; }
-
-    /* 오류 토스트 */
-    .toast {
-      position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
-      background: rgba(255,23,68,0.15);
-      border: 1px solid rgba(255,23,68,0.4);
-      border-radius: 20px; padding: 8px 18px;
-      font-size: 12px; color: #ff5252;
-      display: none; z-index: 20;
-      white-space: nowrap;
-    }
-  </style>
-</head>
-<body>
-
-  <div class="header">
-    <div class="dot" id="dot"></div>
-    <h1>수유역 신호등</h1>
-    <span class="sub" id="updated">연결 중...</span>
-  </div>
-
-  <div id="map"></div>
-
-  <div class="panel">
-    <div class="left">
-      <div class="name" id="panel-name">교차로 정보 로딩 중</div>
-      <div class="addr">서울시 강북구 수유동</div>
-    </div>
-    <div class="right">
-      <div class="status" id="panel-status">--</div>
-      <div class="updated" id="panel-time">--:--:--</div>
-    </div>
-  </div>
-
-  <div class="toast" id="toast"></div>
-
-  <script>
-    const API_URL = "https://suyu-signal.onrender.com/api/signal";
-    const POLL_MS = 2000;
-
-    // 수유역 중심 좌표
-    const CENTER = { lat: 37.6489, lng: 127.0277 };
-
-    // 카카오맵 초기화
-    const mapContainer = document.getElementById("map");
-    const mapOption = {
-      center: new kakao.maps.LatLng(CENTER.lat, CENTER.lng),
-      level: 3
-    };
-    const map = new kakao.maps.Map(mapContainer, mapOption);
-
-    // UI 요소
-    const dotEl       = document.getElementById("dot");
-    const updatedEl   = document.getElementById("updated");
-    const panelName   = document.getElementById("panel-name");
-    const panelStatus = document.getElementById("panel-status");
-    const panelTime   = document.getElementById("panel-time");
-    const toastEl     = document.getElementById("toast");
-
-    // 마커 오버레이 저장
-    let overlay = null;
-
-    function showToast(msg) {
-      toastEl.textContent = "⚠️ " + msg;
-      toastEl.style.display = "block";
-      setTimeout(() => toastEl.style.display = "none", 4000);
-    }
-
-    function updateMarker(lat, lng, sec, isGreen, name) {
-      const color  = isGreen ? "green" : "red";
-      const emoji  = isGreen ? "🟢" : "🔴";
-
-      const content = `
-        <div class="signal-bubble ${color}">
-          <span class="emoji">${emoji}</span>
-          <div class="sec">${sec}</div>
-          <div class="label">초 남음</div>
-        </div>
-      `;
-
-      if (overlay) overlay.setMap(null);
-
-      overlay = new kakao.maps.CustomOverlay({
-        position: new kakao.maps.LatLng(lat, lng),
-        content: content,
-        yAnchor: 1.3
-      });
-      overlay.setMap(map);
-
-      // 헤더 dot
-      dotEl.className = "dot " + color;
-
-      // 하단 패널
-      panelName.textContent         = name;
-      panelStatus.textContent       = isGreen ? "🟢 녹색 신호" : "🔴 적색 신호";
-      panelStatus.className         = "status " + color;
-      panelTime.textContent         = new Date().toLocaleTimeString("ko-KR", { hour12: false });
-      updatedEl.textContent         = new Date().toLocaleTimeString("ko-KR", { hour12: false }) + " 갱신";
-    }
-
-    let errCount = 0;
-
-    async function updateSignal() {
-      try {
-        const res = await fetch(API_URL);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-
-        if (!data?.SptTrafficLghtResidTime?.row?.length) throw new Error("데이터 없음");
-
-        const row     = data.SptTrafficLghtResidTime.row[0];
-        const sec     = Number(row.RESID_TIME);
-        const isGreen = row.LGHT_COL_CD == "1";
-        const name    = row.ITRSC_NM || row.INTRSEC_NM || "수유역 교차로";
-
-        // 좌표: 서울시 데이터에 좌표가 있으면 사용, 없으면 수유역 기본값
-        const lat = row.LAT ? Number(row.LAT) : CENTER.lat;
-        const lng = row.LNG ? Number(row.LNG) : CENTER.lng;
-
-        updateMarker(lat, lng, sec, isGreen, name);
-        errCount = 0;
-
-      } catch (err) {
-        errCount++;
-        if (errCount === 1) showToast(err.message);
-        dotEl.className = "dot";
-        updatedEl.textContent = "수신 실패";
-      } finally {
-        setTimeout(updateSignal, POLL_MS);
-      }
-    }
-
-    updateSignal();
-  </script>
-</body>
-</html>
+      padding: 16px
