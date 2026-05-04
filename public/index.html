@@ -141,7 +141,7 @@
   <script>
     var BASE        = "https://suyu-signal.onrender.com";
     var CENTER      = { lat: 37.6489, lng: 127.0277 };
-    var SUYU_CROSS  = { lat: 37.6483, lng: 127.0270 }; // 수유역 교차로 위치
+    var SUYU_CROSS  = { lat: 37.625395, lng: 127.037088 }; // 오현로20길 교차로
 
     var map = new kakao.maps.Map(document.getElementById("map"), {
       center: new kakao.maps.LatLng(CENTER.lat, CENTER.lng),
@@ -236,7 +236,7 @@
         var row        = d.SptTrafficLghtResidTime.row[0];
         var sec        = Number(row.RESID_TIME);
         var isGreen    = row.LGHT_COL_CD == "1";
-        var name       = row.ITRSC_NM || row.INTRSEC_NM || "수유역 교차로";
+        var name       = row.ITRSC_NM || row.INTRSEC_NM || "오현로20길 교차로";
         var isSimulated = row.SIMULATED === true;
 
         // 실시간 데이터면 해당 좌표, 시뮬레이션이면 수유역 교차로 위치 사용
