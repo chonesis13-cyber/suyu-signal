@@ -31,7 +31,7 @@ app.get("/api/stations", async (req, res) => {
   const { lat, lng } = req.query;
   if (!lat || !lng) return res.status(400).json({ error: "위치 정보 필요" });
   try {
-    const url = `https://dapi.kakao.com/v2/local/search/keyword.json?query=정류장&x=${lng}&y=${lat}&radius=500&size=15`;
+    const url = `http://ws.bus.go.kr/api/rest/stationinfo/getStationsByPos?tmX=${lng}&tmY=${lat}&radius=500&serviceKey=${KAKAO_REST}&resultType=json`;
     const r = await fetch(url, {
       headers: { Authorization: `KakaoAK ${KAKAO_REST}` }
     });
