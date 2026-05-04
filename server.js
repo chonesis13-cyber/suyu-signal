@@ -42,7 +42,7 @@ app.get("/api/signal", async (req, res) => {
       list_total_count: 1,
       RESULT: { CODE: "INFO-000", MESSAGE: "정상 처리되었습니다" },
       row: [{
-        ITRSC_NM: "수유역 교차로",
+        ITRSC_NM: "오현로20길 교차로",
         LGHT_COL_CD: isGreen ? "1" : "2",
         RESID_TIME: residTime,
        LAT: "",
