@@ -20,15 +20,20 @@ const CROSSINGS = [
 
 // 신호 시뮬레이션 (A와 B는 반대 신호)
 function getSignalData() {
-  const CYCLE     = 90;
-  const GREEN_SEC = 30;
-  const now       = Math.floor(Date.now() / 1000);
-  const elapsed   = now % CYCLE;
+  const CYCLE      = 90;
+  const GREEN_SEC  = 30;
+  const RED_SEC    = CYCLE - GREEN_SEC; // 60초
+  const now        = Math.floor(Date.now() / 1000);
+  const elapsed    = now % CYCLE;
 
-  const aIsGreen  = elapsed < GREEN_SEC;
-  const aResid    = aIsGreen ? GREEN_SEC - elapsed : CYCLE - elapsed;
-  const bIsGreen  = !aIsGreen;
-const bResid    = Math.max(1, bIsGreen ? (elapsed - GREEN_SEC) : (GREEN_SEC - elapsed + CYCLE - GREEN_SEC));
+  // A: 0~30초 녹색, 30~90초 적색
+  const aIsGreen   = elapsed < GREEN_SEC;
+  const aResid     = aIsGreen ? GREEN_SEC - elapsed : CYCLE - elapsed;
+
+  // B: 0~60초 적색, 60~90초 녹색 (A와 반대)
+  const bElapsed   = (elapsed + RED_SEC) % CYCLE;
+  const bIsGreen   = bElapsed < GREEN_SEC;
+  const bResid     = bIsGreen ? GREEN_SEC - bElapsed : CYCLE - bElapsed;
   return [
     {
       ITRSC_NM: CROSSINGS[0].name,
