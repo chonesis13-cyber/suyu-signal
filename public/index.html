@@ -139,9 +139,14 @@
   <div class="toast" id="toast"></div>
 
   <script>
-    var BASE        = "https://suyu-signal.onrender.com";
-    var CENTER      = { lat: 37.6489, lng: 127.0277 };
-    var SUYU_CROSS  = { lat: 37.625395, lng: 127.037088 }; // 오현로20길 교차로
+    var BASE    = "https://suyu-signal.onrender.com";
+    var CENTER  = { lat: 37.625395, lng: 127.037088 };
+
+    // 횡단보도 두 곳 좌표
+    var CROSSINGS = [
+      { lat: 37.625428, lng: 127.037069 },
+      { lat: 37.625226, lng: 127.037151 }
+    ];
 
     var map = new kakao.maps.Map(document.getElementById("map"), {
       center: new kakao.maps.LatLng(CENTER.lat, CENTER.lng),
@@ -160,7 +165,7 @@
     var toastEl  = document.getElementById("toast");
     var btnLoc   = document.getElementById("btn-loc");
 
-    var sigOverlay      = null;
+    var sigOverlays     = [];
     var locOverlay      = null;
     var stationOverlays = [];
     var myLat = CENTER.lat, myLng = CENTER.lng;
@@ -200,29 +205,48 @@
       setTimeout(function() { updateWeather(myLat, myLng); }, 600000);
     }
 
-    function setSignalMarker(lat, lng, sec, isGreen, name, isSimulated) {
-      var c = isGreen ? "green" : "red";
-      var e = isGreen ? "🟢" : "🔴";
-      var simTag = isSimulated ? '<div class="s-sim">* 예측값</div>' : '';
+    function clearSignalOverlays() {
+      sigOverlays.forEach(function(o) { o.setMap(null); });
+      sigOverlays = [];
+    }
 
-      if (sigOverlay) sigOverlay.setMap(null);
-      sigOverlay = new kakao.maps.CustomOverlay({
-        position: new kakao.maps.LatLng(lat, lng),
-        content: '<div class="signal-bubble ' + c + '">'
-          + '<span class="s-emoji">' + e + '</span>'
-          + '<div class="s-sec">' + sec + '</div>'
-          + '<div class="s-label">초 남음</div>'
-          + simTag
-          + '</div>',
-        yAnchor: 1.3
+    function setSignalMarkers(rows) {
+      clearSignalOverlays();
+
+      rows.forEach(function(row, i) {
+        var sec        = Number(row.RESID_TIME);
+        var isGreen    = row.LGHT_COL_CD == "1";
+        var isSimulated = row.SIMULATED === true;
+        var c          = isGreen ? "green" : "red";
+        var e          = isGreen ? "🟢" : "🔴";
+        var simTag     = isSimulated ? '<div class="s-sim">* 예측값</div>' : '';
+
+        // 좌표: 데이터에 있으면 사용, 없으면 CROSSINGS 배열 사용
+        var lat = (row.LAT && row.LAT !== "") ? Number(row.LAT) : CROSSINGS[i] ? CROSSINGS[i].lat : CENTER.lat;
+        var lng = (row.LNG && row.LNG !== "") ? Number(row.LNG) : CROSSINGS[i] ? CROSSINGS[i].lng : CENTER.lng;
+
+        var overlay = new kakao.maps.CustomOverlay({
+          position: new kakao.maps.LatLng(lat, lng),
+          content: '<div class="signal-bubble ' + c + '">'
+            + '<span class="s-emoji">' + e + '</span>'
+            + '<div class="s-sec">' + sec + '</div>'
+            + '<div class="s-label">초 남음</div>'
+            + simTag
+            + '</div>',
+          yAnchor: 1.3
+        });
+        overlay.setMap(map);
+        sigOverlays.push(overlay);
+
+        // 첫 번째 신호등 기준으로 하단 패널 업데이트
+        if (i === 0) {
+          sDot.className      = "s-dot " + c;
+          sName.textContent   = (row.ITRSC_NM || "오현로20길 교차로") + (isSimulated ? " (예측)" : "");
+          sStatus.textContent = isGreen ? "🟢 녹색 신호" : "🔴 적색 신호";
+          sStatus.className   = "s-status " + c;
+          sTime.textContent   = new Date().toLocaleTimeString("ko-KR", { hour12: false });
+        }
       });
-      sigOverlay.setMap(map);
-
-      sDot.className      = "s-dot " + c;
-      sName.textContent   = name + (isSimulated ? " (예측)" : "");
-      sStatus.textContent = isGreen ? "🟢 녹색 신호" : "🔴 적색 신호";
-      sStatus.className   = "s-status " + c;
-      sTime.textContent   = new Date().toLocaleTimeString("ko-KR", { hour12: false });
     }
 
     var sigErr = 0;
@@ -232,18 +256,7 @@
         if (!r.ok) throw new Error();
         var d = await r.json();
         if (!d || !d.SptTrafficLghtResidTime || !d.SptTrafficLghtResidTime.row || !d.SptTrafficLghtResidTime.row.length) throw new Error();
-
-        var row        = d.SptTrafficLghtResidTime.row[0];
-        var sec        = Number(row.RESID_TIME);
-        var isGreen    = row.LGHT_COL_CD == "1";
-        var name = row.ITRSC_NM || row.INTRSEC_NM || "오현로20길 교차로";
-        var isSimulated = row.SIMULATED === true;
-
-        // 실시간 데이터면 해당 좌표, 시뮬레이션이면 수유역 교차로 위치 사용
-        var lat = row.LAT ? Number(row.LAT) : SUYU_CROSS.lat;
-        var lng = row.LNG ? Number(row.LNG) : SUYU_CROSS.lng;
-
-        setSignalMarker(lat, lng, sec, isGreen, name, isSimulated);
+        setSignalMarkers(d.SptTrafficLghtResidTime.row);
         sigErr = 0;
       } catch(e) {
         sigErr++;
@@ -253,7 +266,6 @@
       setTimeout(updateSignal, 2000);
     }
 
-    // 카카오 장소검색으로 근처 버스정류장
     var ps = new kakao.maps.services.Places();
 
     function clearStationOverlays() {
@@ -280,10 +292,7 @@
           overlay.setMap(map);
           stationOverlays.push(overlay);
         });
-      }, {
-        location: center,
-        radius: 500
-      });
+      }, { location: center, radius: 500 });
     }
 
     kakao.maps.event.addListener(map, "dragend", function() {
