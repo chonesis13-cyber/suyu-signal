@@ -67,8 +67,6 @@
       border-top: 1px solid rgba(255,255,255,0.07);
       padding: 14px 16px 20px;
     }
-
-    /* 신호등 두 개 표시 */
     .signal-list {
       display: flex; flex-direction: column; gap: 8px;
       padding-bottom: 12px; margin-bottom: 12px;
@@ -90,7 +88,6 @@
     .signal-item .si-status.green { color: #00e676; }
     .signal-item .si-status.red   { color: #ff1744; }
     .signal-item .si-time { font-size: 10px; color: #444; margin-top: 2px; }
-
     .bus-title { font-size: 10px; color: #555; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px; }
     .bus-list  { display: flex; flex-direction: column; gap: 6px; max-height: 100px; overflow-y: auto; }
     .bus-item  {
@@ -129,12 +126,9 @@
   <button class="btn-location" id="btn-loc">📍</button>
 
   <div class="panel">
-    <!-- 신호등 두 개 목록 -->
     <div class="signal-list" id="signal-list">
       <div style="color:#555;font-size:12px;padding:4px">신호 정보 로딩 중...</div>
     </div>
-
-    <!-- 버스 도착 -->
     <div class="bus-title" id="bus-title">🚌 버스 도착 정보 — 정류장을 선택하세요</div>
     <div class="bus-list" id="bus-list">
       <div style="color:#555;font-size:12px;padding:8px">지도에서 🚏 정류장 마커를 클릭하세요</div>
@@ -144,8 +138,8 @@
   <div class="toast" id="toast"></div>
 
   <script>
-    var BASE    = "https://suyu-signal.onrender.com";
-    var CENTER  = { lat: 37.625395, lng: 127.037088 };
+    var BASE      = "https://suyu-signal.onrender.com";
+    var CENTER    = { lat: 37.625395, lng: 127.037088 };
     var CROSSINGS = [
       { lat: 37.625428, lng: 127.037069 },
       { lat: 37.625226, lng: 127.037151 }
@@ -170,6 +164,9 @@
     var stationOverlays = [];
     var myLat = CENTER.lat, myLng = CENTER.lng;
     var searchTimer = null;
+
+    // 신호 상태 저장 (1초 카운트다운용)
+    var signalState = [];
 
     function toast(msg, type) {
       type = type || "err";
@@ -210,9 +207,45 @@
       sigOverlays = [];
     }
 
+    // 패널 업데이트 (1초마다 호출)
+    function updatePanel() {
+      if (!signalState.length) return;
+      var html = "";
+      signalState.forEach(function(s) {
+        var c    = s.isGreen ? "green" : "red";
+        var now  = new Date().toLocaleTimeString("ko-KR", { hour12: false });
+        html += '<div class="signal-item">'
+          + '<div class="si-left">'
+          + '<div class="si-dot ' + c + '"></div>'
+          + '<span class="si-name">' + s.name + '</span>'
+          + (s.isSimulated ? '<span class="si-sim">(예측)</span>' : '')
+          + '</div>'
+          + '<div class="si-right">'
+          + '<div class="si-status ' + c + '">' + (s.isGreen ? "🟢 녹색 " : "🔴 적색 ") + s.sec + "초</div>"
+          + '<div class="si-time">' + now + '</div>'
+          + '</div>'
+          + '</div>';
+      });
+      signalList.innerHTML = html;
+
+      // 지도 마커 초 업데이트
+      var secEls = document.querySelectorAll(".s-sec");
+      secEls.forEach(function(el, i) {
+        if (signalState[i]) el.textContent = signalState[i].sec;
+      });
+    }
+
+    // 1초마다 카운트다운
+    setInterval(function() {
+      signalState.forEach(function(s) {
+        if (s.sec > 1) s.sec--;
+      });
+      updatePanel();
+    }, 1000);
+
     function setSignalMarkers(rows) {
       clearSignalOverlays();
-      var panelHtml = "";
+      signalState = [];
 
       rows.forEach(function(row, i) {
         var sec         = Number(row.RESID_TIME);
@@ -222,10 +255,12 @@
         var e           = isGreen ? "🟢" : "🔴";
         var name        = row.ITRSC_NM || ("오현로20길 교차로 " + (i === 0 ? "A" : "B"));
         var simTag      = isSimulated ? '<div class="s-sim">* 예측값</div>' : '';
-        var now         = new Date().toLocaleTimeString("ko-KR", { hour12: false });
 
         var lat = (row.LAT && row.LAT !== "") ? Number(row.LAT) : CROSSINGS[i] ? CROSSINGS[i].lat : CENTER.lat;
         var lng = (row.LNG && row.LNG !== "") ? Number(row.LNG) : CROSSINGS[i] ? CROSSINGS[i].lng : CENTER.lng;
+
+        // 신호 상태 저장
+        signalState.push({ name: name, sec: sec, isGreen: isGreen, isSimulated: isSimulated });
 
         // 지도 마커
         var overlay = new kakao.maps.CustomOverlay({
@@ -239,22 +274,9 @@
         });
         overlay.setMap(map);
         sigOverlays.push(overlay);
-
-        // 하단 패널 아이템
-        panelHtml += '<div class="signal-item">'
-          + '<div class="si-left">'
-          + '<div class="si-dot ' + c + '"></div>'
-          + '<span class="si-name">' + name + '</span>'
-          + (isSimulated ? '<span class="si-sim">(예측)</span>' : '')
-          + '</div>'
-          + '<div class="si-right">'
-          + '<div class="si-status ' + c + '">' + (isGreen ? "🟢 녹색 " : "🔴 적색 ") + sec + "초</div>"
-          + '<div class="si-time">' + now + '</div>'
-          + '</div>'
-          + '</div>';
       });
 
-      signalList.innerHTML = panelHtml || '<div style="color:#555;font-size:12px;padding:4px">신호 정보 없음</div>';
+      updatePanel();
     }
 
     async function updateSignal() {
@@ -267,26 +289,7 @@
       } catch(e) {
         signalList.innerHTML = '<div style="color:#555;font-size:12px;padding:4px">신호 수신 불가</div>';
       }
-     setTimeout(updateSignal, 2000);
-    }
-
-    // 1초마다 화면 카운트다운
-    setInterval(function() {
-      var items = document.querySelectorAll(".si-status");
-      items.forEach(function(el) {
-        var match = el.textContent.match(/(\d+)초/);
-        if (match) {
-          var sec = parseInt(match[1]);
-          if (sec > 1) {
-            el.textContent = el.textContent.replace(/\d+초/, (sec - 1) + "초");
-          }
-        }
-      });
-      // 지도 마커도 1초마다 업데이트
-      document.querySelectorAll(".s-sec").forEach(function(el) {
-        var sec = parseInt(el.textContent);
-        if (sec > 1) el.textContent = sec - 1;
-      });
+      setTimeout(updateSignal, 2000);
     }
 
     var ps = new kakao.maps.services.Places();
