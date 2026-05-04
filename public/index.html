@@ -6,16 +6,37 @@
     <!-- ⚠️ 본인의 JavaScript 키로 교체 -->
     <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=bd28b2384c551798f2ab4cd0b9f511a1&libraries=services"></script>
     <style>
-        html, body { margin: 0; padding: 0; width: 100%; height: 100%; }
-        #map { width: 100%; height: 100%; position: relative; }
-        .info-panel { position: absolute; top: 10px; left: 10px; z-index: 100; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
-        .timer-box { padding: 5px 10px; border-radius: 20px; color: white; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.2); font-size: 14px; text-align: center; }
-    </style>
-</head>
-<body>
-    <div class="info-panel">
-    <h3 style="margin:0; color: #FF1744;">Do Not Run</h3> <!-- 강조를 위해 색상을 빨간색으로 변경해도 좋습니다 -->
-    <div id="weather">날씨 로딩 중...</div>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; }
+    #map { width: 100%; height: 100%; position: relative; }
+    
+    /* 상단 알림창 수정 */
+    .info-panel { 
+        position: absolute; top: 10px; left: 10px; z-index: 100; 
+        background: rgba(255, 255, 255, 0.95); padding: 12px 20px; 
+        border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); 
+    }
+    
+    /* Do Not Run 문구 스타일 */
+    .title-text { 
+        margin: 0; color: #FF1744; font-size: 20px; font-weight: 900; 
+        letter-spacing: -0.5px;
+    }
+
+    /* 타이머 크기 대폭 확대 (모바일용) */
+    .timer-box { 
+        padding: 8px 16px; border-radius: 30px; color: white; 
+        font-weight: 900; border: 3px solid white; 
+        box-shadow: 0 4px 8px rgba(0,0,0,0.4); 
+        font-size: 22px; /* 기존보다 훨씬 크게 설정 */
+        text-align: center;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+    }
+</style>
+
+<!-- UI 부분 -->
+<div class="info-panel">
+    <h3 class="title-text">Do Not Run</h3>
+    <div id="weather" style="font-size: 14px; font-weight: bold; color: #555;">날씨 로딩 중...</div>
 </div>
 
     <script>
