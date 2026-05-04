@@ -12,9 +12,45 @@ const SEOUL_KEY   = "58456c6f4d61737435384d664d5943";
 const KAKAO_REST  = "b9430d7f52d1000a6038b7eb6402cccc";
 const WEATHER_KEY = "af228254ffa0eb85c2d1ffced047cb05";
 
+// 횡단보도 두 곳 설정
+const CROSSINGS = [
+  { name: "오현로20길 교차로 A", lat: "37.625428", lng: "127.037069" },
+  { name: "오현로20길 교차로 B", lat: "37.625226", lng: "127.037151" }
+];
+
+// 신호 시뮬레이션 (A와 B는 반대 신호)
+function getSignalData() {
+  const CYCLE     = 90;
+  const GREEN_SEC = 30;
+  const now       = Math.floor(Date.now() / 1000);
+  const elapsed   = now % CYCLE;
+
+  const aIsGreen  = elapsed < GREEN_SEC;
+  const aResid    = aIsGreen ? GREEN_SEC - elapsed : CYCLE - elapsed;
+  const bIsGreen  = !aIsGreen;
+  const bResid    = bIsGreen ? GREEN_SEC - (elapsed - GREEN_SEC) : GREEN_SEC - elapsed + (CYCLE - GREEN_SEC);
+
+  return [
+    {
+      ITRSC_NM: CROSSINGS[0].name,
+      LGHT_COL_CD: aIsGreen ? "1" : "2",
+      RESID_TIME: aResid,
+      LAT: "", LNG: "",
+      SIMULATED: true
+    },
+    {
+      ITRSC_NM: CROSSINGS[1].name,
+      LGHT_COL_CD: bIsGreen ? "1" : "2",
+      RESID_TIME: bResid,
+      LAT: "", LNG: "",
+      SIMULATED: true
+    }
+  ];
+}
+
 app.use(cors({ origin: "*" }));
 
-// 신호등 API (실시간 우선, 실패시 시뮬레이션)
+// 신호등 API
 app.get("/api/signal", async (req, res) => {
   if (!fetch) return res.status(503).json({ error: "서버 초기화 중" });
 
@@ -28,27 +64,12 @@ app.get("/api/signal", async (req, res) => {
     if (!d.RESULT) return res.json(d);
   } catch (e) {}
 
-  // 실패시 시뮬레이션 데이터 반환
-  // 수유역 교차로 기준: 전체주기 90초, 녹색 30초, 적색 60초
-  const CYCLE     = 90;
-  const GREEN_SEC = 30;
-  const now       = Math.floor(Date.now() / 1000);
-  const elapsed   = now % CYCLE;
-  const isGreen   = elapsed < GREEN_SEC;
-  const residTime = isGreen ? GREEN_SEC - elapsed : CYCLE - elapsed;
-
+  // 실패시 시뮬레이션
   res.json({
     SptTrafficLghtResidTime: {
-      list_total_count: 1,
+      list_total_count: 2,
       RESULT: { CODE: "INFO-000", MESSAGE: "정상 처리되었습니다" },
-      row: [{
-        ITRSC_NM: "오현로20길 교차로",
-        LGHT_COL_CD: isGreen ? "1" : "2",
-        RESID_TIME: residTime,
-       LAT: "",
-       LNG: "",
-        SIMULATED: true
-      }]
+      row: getSignalData()
     }
   });
 });
