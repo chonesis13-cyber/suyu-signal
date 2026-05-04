@@ -2,70 +2,92 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Suyu-Signal 지도 & 날씨</title>
-    <script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=발급받은_자바스크립트_키_입력"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suyu-Signal 통합 지도</title>
+    <!-- ⚠️ 여기서 '본인의_자바스크립트_키'를 실제 키로 반드시 교체하세요! -->
+    <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=본인의_자바스크립트_키"></script>
+    
     <style>
-        body { margin: 0; padding: 0; font-family: sans-serif; }
-        #map { width: 100%; height: 100vh; }
+        /* 지도가 화면에 꽉 차게 나오게 하는 필수 스타일 */
+        html, body { margin: 0; padding: 0; width: 100%; height: 100%; }
+        #map { width: 100%; height: 100vh; position: relative; overflow: hidden; }
+        
         .info-panel { 
-            position: absolute; top: 10px; left: 10px; z-index: 10; 
-            background: rgba(255, 255, 255, 0.9); padding: 15px; 
-            border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); 
+            position: absolute; top: 20px; left: 20px; z-index: 100; 
+            background: white; padding: 20px; border-radius: 12px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: 250px;
         }
-        #weather-info { margin-top: 10px; font-weight: bold; color: #0052CC; }
+        h3 { margin: 0 0 10px 0; color: #333; }
+        #weather-info { font-size: 14px; color: #0052CC; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div class="info-panel">
         <h3>수유 신호등 프로젝트</h3>
-        <div id="weather-info">날씨 불러오는 중...</div>
+        <div id="weather-info">날씨 정보를 불러오는 중...</div>
+        <hr>
+        <p style="font-size: 12px; color: #666;">파란색 버스 아이콘은<br>주변 정류장 위치입니다.</p>
     </div>
     
+    <!-- 지도가 그려지는 영역 -->
     <div id="map"></div>
 
     <script>
-        const lat = 37.6254;
-        const lng = 127.0370;
+        // 현재 위치 좌표 (수유 오현로 인근)
+        const MY_LAT = 37.6254;
+        const MY_LNG = 127.0370;
 
-        // 1. 지도 설정
-        const map = new kakao.maps.Map(document.getElementById('map'), {
-            center: new kakao.maps.LatLng(lat, lng),
-            level: 3
-        });
+        // 1. 지도 생성 및 초기화
+        const mapContainer = document.getElementById('map');
+        const mapOptions = {
+            center: new kakao.maps.LatLng(MY_LAT, MY_LNG),
+            level: 3 // 확대 레벨
+        };
+        const map = new kakao.maps.Map(mapContainer, mapOptions);
 
-        // 2. 버스 마커 설정
-        const busIconSvg = `data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cGF0aCBmaWxsPSIjMDA1MkNDIiBkPSJNNDg4IDEyOEg0MGMtMjIuMSAwLTQwIDE3LjktNDAgNDB2MjU2YzAgMjIuMSAxNy45IDQwIDQwIDQwaDQ0OGMyMi41IDAgNDAtMTcuOSA0MC00MFYxNjhjMC0yMi4xLTE3LjktNDAtNDAtNDB6TTEyOCAzNTJjLTE3LjcgMC0zMi0xNC4zLTMyLTMyczE0LjMtMzIgMzItMzIgMzIgMTQuMyAzMiAzMi0xNC4zIDMyLTMyIDMyem0yNTYgMGMtMTcxIDAtMzItMTQuMy0zMi0zMnMxNC4zLTMyIDMyLTMyIDMyIDE0LjMgMzIgMzItMTQuMyAzMi0zMiAzMnoiLz48L3N2Zz4=`;
-        const busMarkerImage = new kakao.maps.MarkerImage(busIconSvg, new kakao.maps.Size(35, 35));
+        // 2. 버스 마커 이미지 정의 (SVG)
+        const busIcon = `data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cGF0aCBmaWxsPSIjMDA1MkNDIiBkPSJNNDg4IDEyOEg0MGMtMjIuMSAwLTQwIDE3LjktNDAgNDB2MjU2YzAgMjIuMSAxNy45IDQwIDQwIDQwaDQ0OGMyMi4xIDAgNDAtMTcuOSA0MC00MFYxNjhjMC0yMi4xLTE3LjktNDAtNDAtNDB6TTEyOCAzNTJjLTE3LjcgMC0zMi0xNC4zLTMyLTMyczE0LjMtMzIgMzItMzIgMzIgMTQuMyAzMiAzMi0xNC4zIDMyLTMyIDMyem0yNTYgMGMtMTcxIDAtMzItMTQuMy0zMi0zMnMxNC4zLTMyIDMyLTMyIDMyIDE0LjMgMzIgMzItMTQuMyAzMi0zMiAzMnoiLz48L3N2Zz4=`;
+        const markerSize = new kakao.maps.Size(35, 35);
+        const busImage = new kakao.maps.MarkerImage(busIcon, markerSize);
 
-        // 3. 날씨 정보 가져오기 함수
+        // 3. 날씨 불러오기
         async function loadWeather() {
             try {
-                const res = await fetch(`/api/weather?lat=${lat}&lng=${lng}`);
+                const res = await fetch(`/api/weather?lat=${MY_LAT}&lng=${MY_LNG}`);
                 const data = await res.json();
-                const temp = data.main.temp;
-                const desc = data.weather[0].description;
-                document.getElementById('weather-info').innerText = `🌡️ 현재 기온: ${temp}°C (${desc})`;
+                if(data.main) {
+                    const temp = Math.round(data.main.temp);
+                    const desc = data.weather[0].description;
+                    document.getElementById('weather-info').innerHTML = `🌡️ 현재 ${temp}°C / ${desc}`;
+                }
             } catch (e) {
-                document.getElementById('weather-info').innerText = "날씨 정보 실패";
+                document.getElementById('weather-info').innerText = "날씨 로드 실패";
             }
         }
 
-        // 4. 정류장 마커 가져오기
+        // 4. 버스 정류장 마커 표시
         async function loadStations() {
-            const res = await fetch(`/api/stations?lat=${lat}&lng=${lng}`);
-            const data = await res.json();
-            data.documents.forEach(station => {
-                new kakao.maps.Marker({
-                    map: map,
-                    position: new kakao.maps.LatLng(station.y, station.x),
-                    image: busMarkerImage,
-                    title: station.place_name
-                });
-            });
+            try {
+                const res = await fetch(`/api/stations?lat=${MY_LAT}&lng=${MY_LNG}`);
+                const data = await res.json();
+                
+                if (data.documents) {
+                    data.documents.forEach(item => {
+                        const marker = new kakao.maps.Marker({
+                            map: map,
+                            position: new kakao.maps.LatLng(item.y, item.x),
+                            image: busImage,
+                            title: item.place_name
+                        });
+                    });
+                }
+            } catch (e) {
+                console.error("정류장 로드 실패:", e);
+            }
         }
 
-        // 실행
+        // 초기 실행
         loadWeather();
         loadStations();
     </script>
