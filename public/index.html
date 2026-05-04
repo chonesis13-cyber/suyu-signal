@@ -4,12 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Do Not Run</title>
-  <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=bd28b2384c551798f2ab4cd0b9f511a1&libraries=services"></script>
+  <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=bd28b2384c551798f2ab4cd0b9f511a1&libraries=services,places"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; background: #0d0d0d; }
-
-    /* 헤더 */
     .header {
       position: fixed; top: 0; left: 0; right: 0; z-index: 20;
       background: rgba(13,13,13,0.95); backdrop-filter: blur(12px);
@@ -23,11 +21,7 @@
     .weather-info .temp { font-size: 15px; font-weight: 700; color: #fff; }
     .weather-info .desc { font-size: 11px; color: #888; }
     .w-icon { font-size: 22px; }
-
-    /* 지도 */
     #map { width: 100vw; height: 100vh; }
-
-    /* 현재위치 버튼 */
     .btn-location {
       position: fixed; right: 16px; bottom: 240px; z-index: 15;
       width: 46px; height: 46px; border-radius: 50%;
@@ -37,8 +31,6 @@
       font-size: 20px; cursor: pointer; transition: transform 0.15s;
     }
     .btn-location:active { transform: scale(0.92); }
-
-    /* 신호등 마커 */
     .signal-bubble {
       background: #1a1a1a; border: 2px solid #333;
       border-radius: 14px; padding: 8px 12px;
@@ -52,8 +44,6 @@
     .signal-bubble.green .s-sec { color: #00e676; }
     .signal-bubble.red   .s-sec { color: #ff1744; }
     .signal-bubble .s-label { font-size: 9px; color: #777; margin-top: 2px; }
-
-    /* 버스 정류장 마커 */
     .bus-marker {
       background: #1a1a1a; border: 2px solid #2979ff;
       border-radius: 10px; padding: 4px 8px;
@@ -61,9 +51,6 @@
       box-shadow: 0 2px 10px rgba(0,0,0,0.5); cursor: pointer;
       white-space: nowrap;
     }
-    .bus-marker:hover { background: #1e3a5f; }
-
-    /* 현재위치 마커 */
     .my-dot {
       width: 18px; height: 18px; border-radius: 50%;
       background: #2979ff; border: 3px solid #fff;
@@ -73,16 +60,12 @@
       0%   { box-shadow: 0 0 0 0 rgba(41,121,255,0.4); }
       100% { box-shadow: 0 0 0 14px rgba(41,121,255,0); }
     }
-
-    /* 하단 패널 */
     .panel {
       position: fixed; bottom: 0; left: 0; right: 0; z-index: 15;
       background: rgba(13,13,13,0.97); backdrop-filter: blur(12px);
       border-top: 1px solid rgba(255,255,255,0.07);
       padding: 14px 16px 20px;
     }
-
-    /* 신호 행 */
     .signal-row {
       display: flex; align-items: center; justify-content: space-between;
       padding-bottom: 12px; margin-bottom: 12px;
@@ -98,14 +81,11 @@
     .s-status.green { color: #00e676; }
     .s-status.red   { color: #ff1744; }
     .s-time   { font-size: 10px; color: #444; margin-top: 2px; text-align: right; }
-
-    /* 버스 섹션 */
     .bus-title { font-size: 10px; color: #555; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px; }
     .bus-list  { display: flex; flex-direction: column; gap: 6px; max-height: 120px; overflow-y: auto; }
     .bus-item  {
       display: flex; align-items: center;
       background: rgba(255,255,255,0.04); border-radius: 10px; padding: 8px 12px;
-      flex-shrink: 0;
     }
     .bus-no { font-size: 12px; font-weight: 800; color: #fff; background: #1e3a5f; padding: 2px 7px; border-radius: 6px; margin-right: 8px; white-space: nowrap; }
     .bus-no.village { background: #1a4a2e; }
@@ -113,8 +93,6 @@
     .bus-arrive { font-size: 12px; font-weight: 700; color: #fff; text-align: right; white-space: nowrap; }
     .bus-arrive.soon    { color: #ff6b35; }
     .bus-arrive.loading { color: #444; font-size: 11px; }
-
-    /* 토스트 */
     .toast {
       position: fixed; top: 64px; left: 50%; transform: translateX(-50%);
       border-radius: 20px; padding: 8px 18px; font-size: 12px;
@@ -125,7 +103,6 @@
   </style>
 </head>
 <body>
-
   <div class="header">
     <img src="logo.png" alt="logo" />
     <span class="app-name">Do Not Run</span>
@@ -161,10 +138,8 @@
   <div class="toast" id="toast"></div>
 
   <script>
-    const BASE     = "https://suyu-signal.onrender.com";
-    const CENTER   = { lat: 37.6489, lng: 127.0277 };
-    const POLL_SIG = 2000;
-    const POLL_WEA = 600000;
+    const BASE   = "https://suyu-signal.onrender.com";
+    const CENTER = { lat: 37.6489, lng: 127.0277 };
 
     const map = new kakao.maps.Map(document.getElementById("map"), {
       center: new kakao.maps.LatLng(CENTER.lat, CENTER.lng),
@@ -183,8 +158,8 @@
     const toastEl  = document.getElementById("toast");
     const btnLoc   = document.getElementById("btn-loc");
 
-    let sigOverlay  = null;
-    let locOverlay  = null;
+    let sigOverlay = null;
+    let locOverlay = null;
     let stationOverlays = [];
     let myLat = CENTER.lat, myLng = CENTER.lng;
     let searchTimer = null;
@@ -217,10 +192,9 @@
         wDesc.textContent = d.weather[0].description;
         wIcon.textContent = weatherEmoji(d.weather[0].id);
       } catch { wDesc.textContent = "날씨 정보 없음"; }
-      finally  { setTimeout(() => updateWeather(myLat, myLng), POLL_WEA); }
+      finally  { setTimeout(() => updateWeather(myLat, myLng), 600000); }
     }
 
-    // 신호등 마커
     function setSignalMarker(lat, lng, sec, isGreen, name) {
       const c = isGreen ? "green" : "red";
       const e = isGreen ? "🟢" : "🔴";
@@ -242,14 +216,13 @@
       sTime.textContent   = new Date().toLocaleTimeString("ko-KR", { hour12: false });
     }
 
-    // 신호 갱신
     let sigErr = 0;
     async function updateSignal() {
       try {
         const r = await fetch(`${BASE}/api/signal`);
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        if (!r.ok) throw new Error();
         const d = await r.json();
-        if (!d?.SptTrafficLghtResidTime?.row?.length) throw new Error("데이터 없음");
+        if (!d?.SptTrafficLghtResidTime?.row?.length) throw new Error();
         const row     = d.SptTrafficLghtResidTime.row[0];
         const sec     = Number(row.RESID_TIME);
         const isGreen = row.LGHT_COL_CD == "1";
@@ -258,78 +231,49 @@
         const lng     = row.LNG ? Number(row.LNG) : CENTER.lng;
         setSignalMarker(lat, lng, sec, isGreen, name);
         sigErr = 0;
-      } catch(e) {
+      } catch {
         sigErr++;
-        if (sigErr === 1) toast("⚠️ 신호 수신 실패");
         sDot.className      = "s-dot";
         sStatus.textContent = "수신 불가";
       } finally {
-        setTimeout(updateSignal, POLL_SIG);
+        setTimeout(updateSignal, 2000);
       }
     }
 
-    // 버스 도착 정보
-    function fmtArrive(msg) {
-      if (!msg || msg === "운행종료") return { text: "운행종료", soon: false };
-      const m = parseInt(msg);
-      if (!isNaN(m)) return { text: m <= 1 ? "곧 도착" : m + "분 후", soon: m <= 3 };
-      return { text: msg, soon: false };
-    }
+    // 카카오 장소검색으로 근처 버스정류장 찾기
+    const ps = new kakao.maps.services.Places();
 
-    async function loadBusArrival(arsId, stationName) {
-      busTitle.textContent = `🚌 ${stationName}`;
-      busList.innerHTML    = `<div style="color:#555;font-size:12px;padding:8px">로딩 중...</div>`;
-      try {
-        const r = await fetch(`${BASE}/api/bus?arsId=${arsId}`);
-        const d = await r.json();
-        const rows = d?.msgBody?.itemList || [];
-        if (!rows.length) {
-          busList.innerHTML = `<div style="color:#555;font-size:12px;padding:8px">도착 정보 없음</div>`;
-          return;
-        }
-        busList.innerHTML = rows.slice(0, 5).map(item => {
-          const isV = item.rtNm?.includes("강북") || item.rtNm?.startsWith("마을");
-          const a1  = fmtArrive(item.arrmsg1);
-          const a2  = fmtArrive(item.arrmsg2);
-          return `<div class="bus-item">
-            <span class="bus-no ${isV ? "village" : ""}">${item.rtNm}</span>
-            <span class="bus-stop">${item.stNm || stationName}</span>
-            <span class="bus-arrive ${a1.soon ? "soon" : ""}">${a1.text} · ${a2.text}</span>
-          </div>`;
-        }).join("");
-      } catch {
-        busList.innerHTML = `<div style="color:#555;font-size:12px;padding:8px">정보 수신 실패</div>`;
-      }
-    }
-
-    // 근처 정류장 마커
     function clearStationOverlays() {
       stationOverlays.forEach(o => o.setMap(null));
       stationOverlays = [];
     }
 
-    async function loadNearbyStations() {
+    function loadNearbyStations() {
       const center = map.getCenter();
-      const lat    = center.getLat();
-      const lng    = center.getLng();
-      try {
-        const r = await fetch(`${BASE}/api/stations?lat=${lat}&lng=${lng}`);
-        const d = await r.json();
-        const stations = d?.msgBody?.itemList || [];
+      ps.keywordSearch("버스", (data, status) => {
+        if (status !== kakao.maps.services.Status.OK) return;
         clearStationOverlays();
-        stations.forEach(st => {
+        data.forEach(place => {
+          if (!place.place_name.includes("정류") && !place.place_name.includes("버스")) return;
           const overlay = new kakao.maps.CustomOverlay({
-            position: new kakao.maps.LatLng(Number(st.tmY), Number(st.tmX)),
-            content: `<div class="bus-marker" onclick="loadBusArrival('${st.arsId}','${st.stNm}')">🚏 ${st.stNm}</div>`,
+            position: new kakao.maps.LatLng(place.y, place.x),
+            content: `<div class="bus-marker" onclick="showStation('${place.place_name}')">🚏 ${place.place_name}</div>`,
             yAnchor: 1.3
           });
           overlay.setMap(map);
           stationOverlays.push(overlay);
         });
-      } catch { /* 정류장 로딩 실패 무시 */ }
+      }, {
+        location: center,
+        radius: 500
+      });
     }
 
-    // 지도 이동시 정류장 갱신
+    function showStation(name) {
+      busTitle.textContent = `🚌 ${name}`;
+      busList.innerHTML = `<div style="color:#555;font-size:12px;padding:8px">버스 API 연동 준비 중...</div>`;
+    }
+
     kakao.maps.event.addListener(map, "dragend", () => {
       clearTimeout(searchTimer);
       searchTimer = setTimeout(loadNearbyStations, 500);
@@ -339,7 +283,6 @@
       searchTimer = setTimeout(loadNearbyStations, 500);
     });
 
-    // 현재위치
     function setMyLocation(lat, lng) {
       myLat = lat; myLng = lng;
       if (locOverlay) locOverlay.setMap(null);
@@ -368,7 +311,6 @@
       );
     });
 
-    // 시작
     updateSignal();
     updateWeather(CENTER.lat, CENTER.lng);
     loadNearbyStations();
