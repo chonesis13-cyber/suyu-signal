@@ -8,7 +8,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 const SEOUL_API_KEY  = "58456c6f4d61737435384d664d5943";
-const BUS_API_KEY    = "c952d3135ee72f0c3dfa7b5fba5db877cd6d00d6a104d970efc0e586d71e196c";
+const BUS_API_KEY = "f1786639cd3d3785e1866ee164273ef747d3f5e5a7f5a6b34177bb90c3d1af4f";
 const SEOUL_API_URL  = `http://openAPI.seoul.go.kr:8088/${SEOUL_API_KEY}/json/SptTrafficLghtResidTime/1/5/`;
 
 const BUS_STATIONS = [
