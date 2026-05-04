@@ -1,97 +1,108 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Suyu-Signal 통합</title>
-    <!-- ⚠️ 본인의 JavaScript 키로 교체 -->
+    <!-- 모바일에서 화면 크기를 적절하게 조절해주는 설정 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Suyu-Signal Do Not Run</title>
+    <!-- ⚠️ 실제 발급받은 JavaScript 키로 반드시 교체하세요 -->
     <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=bd28b2384c551798f2ab4cd0b9f511a1&libraries=services"></script>
     <style>
-    html, body { margin: 0; padding: 0; width: 100%; height: 100%; }
-    #map { width: 100%; height: 100%; position: relative; }
-    
-    /* 상단 알림창 수정 */
-    .info-panel { 
-        position: absolute; top: 10px; left: 10px; z-index: 100; 
-        background: rgba(255, 255, 255, 0.95); padding: 12px 20px; 
-        border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); 
-    }
-    
-    /* Do Not Run 문구 스타일 */
-    .title-text { 
-        margin: 0; color: #FF1744; font-size: 20px; font-weight: 900; 
-        letter-spacing: -0.5px;
-    }
+        /* 화면 전체를 지도로 채움 */
+        html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+        #map { width: 100%; height: 100vh; position: relative; background: #f0f0f0; }
 
-    /* 타이머 크기 대폭 확대 (모바일용) */
-    .timer-box { 
-        padding: 8px 16px; border-radius: 30px; color: white; 
-        font-weight: 900; border: 3px solid white; 
-        box-shadow: 0 4px 8px rgba(0,0,0,0.4); 
-        font-size: 22px; /* 기존보다 훨씬 크게 설정 */
-        text-align: center;
-        text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
-    }
-</style>
+        /* 상단 안내 패널 */
+        .info-panel { 
+            position: absolute; top: env(safe-area-inset-top, 10px); left: 10px; z-index: 100; 
+            background: rgba(255, 255, 255, 0.9); padding: 12px 18px; 
+            border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            backdrop-filter: blur(5px);
+        }
+        
+        .title-text { 
+            margin: 0; color: #FF1744; font-size: 22px; font-weight: 900; 
+            letter-spacing: -1px; line-height: 1.2;
+        }
 
-<!-- UI 부분 -->
-<div class="info-panel">
-    <h3 class="title-text">Do Not Run</h3>
-    <div id="weather" style="font-size: 14px; font-weight: bold; color: #555;">날씨 로딩 중...</div>
-</div>
+        #weather { font-size: 13px; font-weight: bold; color: #666; margin-top: 4px; }
+
+        /* 지도 위 타이머 스타일 (크기 대폭 확대) */
+        .timer-box { 
+            padding: 10px 18px; border-radius: 40px; color: white; 
+            font-weight: 900; border: 4px solid white; 
+            box-shadow: 0 6px 12px rgba(0,0,0,0.3); 
+            font-size: 28px; /* 핸드폰에서 아주 잘 보이게 크게 설정 */
+            text-align: center;
+            min-width: 60px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="info-panel">
+        <h3 class="title-text">Do Not Run</h3>
+        <div id="weather">날씨 로딩 중...</div>
+    </div>
+    
+    <div id="map"></div>
 
     <script>
-        // 카카오 지도 로드 보장
+        // 카카오 지도 SDK가 로드된 후 실행
         kakao.maps.load(function() {
-            const MY_LAT = 37.6254, MY_LNG = 127.0370;
+            const CENTER_LAT = 37.6254, CENTER_LNG = 127.0370;
             const container = document.getElementById('map');
-            const options = { center: new kakao.maps.LatLng(MY_LAT, MY_LNG), level: 3 };
+            const options = { 
+                center: new kakao.maps.LatLng(CENTER_LAT, CENTER_LNG), 
+                level: 3 
+            };
             const map = new kakao.maps.Map(container, options);
 
-            // 버스 아이콘 설정
+            // 버스 아이콘 (파란색)
             const busIcon = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cGF0aCBmaWxsPSIjMDA1MkNDIiBkPSJNNDg4IDEyOEg0MGMtMjIuMSAwLTQwIDE3LjktNDAgNDB2MjU2YzAgMjIuMSAxNy45IDQwIDQwIDQwaDQ0OGMyMi4xIDAgNDAtMTcuOSA0MC00MFYxNjhjMC0yMi4xLTE3LjktNDAtNDAtNDB6TTEyOCAzNTJjLTE3LjcgMC0zMi0xNC4zLTMyLTMyczE0LjMtMzIgMzItMzIgMzIgMTQuMyAzMiAzMi0xNC4zIDMyLTMyIDMyem0yNTYgMGMtMTcxIDAtMzItMTQuMy0zMi0zMnMxNC4zLTMyIDMyLTMyIDMyIDE0LjMgMzIgMzItMTQuMyAzMi0zMiAzMnoiLz48L3N2Zz4=";
-            const busImg = new kakao.maps.MarkerImage(busIcon, new kakao.maps.Size(35, 35));
+            const busImg = new kakao.maps.MarkerImage(busIcon, new kakao.maps.Size(36, 36));
 
             let signalOverlays = [];
 
-            // 1. 날씨 로드
-            async function loadWeather() {
+            // [함수] 날씨 및 신호 데이터 업데이트
+            async function updateRealtimeData() {
                 try {
-                    const res = await fetch(`/api/weather?lat=${MY_LAT}&lng=${MY_LNG}`);
-                    const data = await res.json();
-                    document.getElementById('weather').innerText = `🌡️ ${Math.round(data.main.temp)}°C / ${data.weather[0].description}`;
-                } catch (e) { console.error("날씨 실패", e); }
-            }
+                    // 날씨 가져오기
+                    const wRes = await fetch(`/api/weather?lat=${CENTER_LAT}&lng=${CENTER_LNG}`);
+                    const wData = await wRes.json();
+                    document.getElementById('weather').innerText = `🌡️ ${Math.round(wData.main.temp)}°C / ${wData.weather[0].description}`;
 
-            // 2. 신호등 타이머 로드 (지도 위에 그리기)
-            async function loadSignals() {
-                try {
-                    const res = await fetch('/api/signal');
-                    const data = await res.json();
-                    const rows = data.SptTrafficLghtResidTime.row;
+                    // 신호등 데이터 가져오기
+                    const sRes = await fetch('/api/signal');
+                    const sData = await sRes.json();
+                    const rows = sData.SptTrafficLghtResidTime.row;
 
-                    // 기존 오버레이 삭제
+                    // 기존 타이머 제거
                     signalOverlays.forEach(o => o.setMap(null));
                     signalOverlays = [];
 
+                    // 새 타이머 생성
                     rows.forEach(s => {
-                        const color = s.LGHT_COL_CD === "1" ? "#00E676" : "#FF1744";
+                        const color = s.LGHT_COL_CD === "1" ? "#00E676" : "#FF1744"; // 녹색/적색
                         const content = `<div class="timer-box" style="background:${color}">${s.RESID_TIME}s</div>`;
                         
                         const overlay = new kakao.maps.CustomOverlay({
                             map: map,
                             position: new kakao.maps.LatLng(s.LAT, s.LNG),
                             content: content,
-                            yAnchor: 1.5
+                            yAnchor: 1.5 // 마커가 실제 지점보다 약간 위로 뜨게 조정
                         });
                         signalOverlays.push(overlay);
                     });
-                } catch (e) { console.error("신호 실패", e); }
+                } catch (e) {
+                    console.error("데이터 로드 중 오류 발생:", e);
+                }
             }
 
-            // 3. 버스 정류장 로드
+            // [함수] 주변 버스 정류장 표시 (1회성)
             async function loadStations() {
                 try {
-                    const res = await fetch(`/api/stations?lat=${MY_LAT}&lng=${MY_LNG}`);
+                    const res = await fetch(`/api/stations?lat=${CENTER_LAT}&lng=${CENTER_LNG}`);
                     const data = await res.json();
                     data.documents.forEach(p => {
                         new kakao.maps.Marker({
@@ -101,14 +112,15 @@
                             title: p.place_name
                         });
                     });
-                } catch (e) { console.error("정류소 실패", e); }
+                } catch (e) { console.error("버스 정류장 로드 실패:", e); }
             }
 
-            // 실행 및 주기적 업데이트
-            loadWeather();
+            // 초기 실행
             loadStations();
-            loadSignals();
-            setInterval(loadSignals, 1000); // 1초마다 타이머 갱신
+            updateRealtimeData();
+            
+            // 1초마다 신호등 및 날씨 데이터 갱신
+            setInterval(updateRealtimeData, 1000);
         });
     </script>
 </body>
