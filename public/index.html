@@ -267,7 +267,26 @@
       } catch(e) {
         signalList.innerHTML = '<div style="color:#555;font-size:12px;padding:4px">신호 수신 불가</div>';
       }
-      setTimeout(updateSignal, 2000);
+     setTimeout(updateSignal, 2000);
+    }
+
+    // 1초마다 화면 카운트다운
+    setInterval(function() {
+      var items = document.querySelectorAll(".si-status");
+      items.forEach(function(el) {
+        var match = el.textContent.match(/(\d+)초/);
+        if (match) {
+          var sec = parseInt(match[1]);
+          if (sec > 1) {
+            el.textContent = el.textContent.replace(/\d+초/, (sec - 1) + "초");
+          }
+        }
+      });
+      // 지도 마커도 1초마다 업데이트
+      document.querySelectorAll(".s-sec").forEach(function(el) {
+        var sec = parseInt(el.textContent);
+        if (sec > 1) el.textContent = sec - 1;
+      });
     }
 
     var ps = new kakao.maps.services.Places();
