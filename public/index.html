@@ -1,95 +1,95 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html>
 <head>
     <meta charset="UTF-8">
-    <title>Suyu-Signal 통합 서비스</title>
-    <!-- ⚠️ 카카오 JavaScript 키를 여기에 넣으세요 -->
-    <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=bd28b2384c551798f2ab4cd0b9f511a1"></script>
+    <title>Suyu-Signal 통합</title>
+    <!-- ⚠️ 본인의 JavaScript 키로 교체 -->
+    <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=bd28b2384c551798f2ab4cd0b9f511a1&libraries=services"></script>
     <style>
         html, body { margin: 0; padding: 0; width: 100%; height: 100%; }
-        #map { width: 100%; height: 100vh; position: relative; }
-        .info-panel { 
-            position: absolute; top: 15px; left: 15px; z-index: 100; 
-            background: white; padding: 15px; border-radius: 10px; 
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2); width: 220px;
-        }
-        #weather { font-size: 14px; color: #0052CC; font-weight: bold; margin-top: 5px; }
-        .timer-label { 
-            padding: 4px 8px; border-radius: 20px; color: white; 
-            font-weight: bold; font-size: 12px; border: 2px solid white; 
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3); text-align: center;
-        }
+        #map { width: 100%; height: 100%; position: relative; }
+        .info-panel { position: absolute; top: 10px; left: 10px; z-index: 100; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+        .timer-box { padding: 5px 10px; border-radius: 20px; color: white; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.2); font-size: 14px; text-align: center; }
     </style>
 </head>
 <body>
-
     <div class="info-panel">
-        <h4 style="margin:0">수유 신호등 프로젝트</h4>
+        <h3 style="margin:0">수유 신호등 프로젝트</h3>
         <div id="weather">날씨 로딩 중...</div>
     </div>
-    
     <div id="map"></div>
 
     <script>
-        const CENTER = { lat: 37.6254, lng: 127.0370 };
-        const map = new kakao.maps.Map(document.getElementById('map'), {
-            center: new kakao.maps.LatLng(CENTER.lat, CENTER.lng),
-            level: 3
-        });
+        // 카카오 지도 로드 보장
+        kakao.maps.load(function() {
+            const MY_LAT = 37.6254, MY_LNG = 127.0370;
+            const container = document.getElementById('map');
+            const options = { center: new kakao.maps.LatLng(MY_LAT, MY_LNG), level: 3 };
+            const map = new kakao.maps.Map(container, options);
 
-        // 1. 버스 마커 설정 (파란 버스 SVG)
-        const busIcon = `data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cGF0aCBmaWxsPSIjMDA1MkNDIiBkPSJNNDg4IDEyOEg0MGMtMjIuMSAwLTQwIDE3LjktNDAgNDB2MjU2YzAgMjIuMSAxNy45IDQwIDQwIDQwaDQ0OGMyMi4xIDAgNDAtMTcuOSA0MC00MFYxNjhjMC0yMi4xLTE3LjktNDAtNDAtNDB6TTEyOCAzNTJjLTE3LjcgMC0zMi0xNC4zLTMyLTMyczE0LjMtMzIgMzItMzIgMzIgMTQuMyAzMiAzMi0xNC4zIDMyLTMyIDMyem0yNTYgMGMtMTcxIDAtMzItMTQuMy0zMi0zMnMxNC4zLTMyIDMyLTMyIDMyIDE0LjMgMzIgMzItMTQuMyAzMi0zMiAzMnoiLz48L3N2Zz4=`;
-        const busImg = new kakao.maps.MarkerImage(busIcon, new kakao.maps.Size(30, 30));
+            // 버스 아이콘 설정
+            const busIcon = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cGF0aCBmaWxsPSIjMDA1MkNDIiBkPSJNNDg4IDEyOEg0MGMtMjIuMSAwLTQwIDE3LjktNDAgNDB2MjU2YzAgMjIuMSAxNy45IDQwIDQwIDQwaDQ0OGMyMi4xIDAgNDAtMTcuOSA0MC00MFYxNjhjMC0yMi4xLTE3LjktNDAtNDAtNDB6TTEyOCAzNTJjLTE3LjcgMC0zMi0xNC4zLTMyLTMyczE0LjMtMzIgMzItMzIgMzIgMTQuMyAzMiAzMi0xNC4zIDMyLTMyIDMyem0yNTYgMGMtMTcxIDAtMzItMTQuMy0zMi0zMnMxNC4zLTMyIDMyLTMyIDMyIDE0LjMgMzIgMzItMTQuMyAzMi0zMiAzMnoiLz48L3N2Zz4=";
+            const busImg = new kakao.maps.MarkerImage(busIcon, new kakao.maps.Size(35, 35));
 
-        // 2. 신호등 오버레이 관리를 위한 배열
-        let signalOverlays = [];
+            let signalOverlays = [];
 
-        // [함수] 신호등 타이머 업데이트
-        async function updateSignals() {
-            try {
-                const res = await fetch('/api/signal');
-                const data = await res.json();
-                
-                // 기존 타이머 제거
-                signalOverlays.forEach(o => o.setMap(null));
-                signalOverlays = [];
+            // 1. 날씨 로드
+            async function loadWeather() {
+                try {
+                    const res = await fetch(`/api/weather?lat=${MY_LAT}&lng=${MY_LNG}`);
+                    const data = await res.json();
+                    document.getElementById('weather').innerText = `🌡️ ${Math.round(data.main.temp)}°C / ${data.weather[0].description}`;
+                } catch (e) { console.error("날씨 실패", e); }
+            }
 
-                data.SptTrafficLghtResidTime.row.forEach(s => {
-                    const color = s.LGHT_COL_CD === "1" ? "#00E676" : "#FF1744";
-                    const content = `<div class="timer-label" style="background:${color}">${s.RESID_TIME}s</div>`;
-                    
-                    const overlay = new kakao.maps.CustomOverlay({
-                        position: new kakao.maps.LatLng(s.LAT, s.LNG),
-                        content: content,
-                        yAnchor: 1
+            // 2. 신호등 타이머 로드 (지도 위에 그리기)
+            async function loadSignals() {
+                try {
+                    const res = await fetch('/api/signal');
+                    const data = await res.json();
+                    const rows = data.SptTrafficLghtResidTime.row;
+
+                    // 기존 오버레이 삭제
+                    signalOverlays.forEach(o => o.setMap(null));
+                    signalOverlays = [];
+
+                    rows.forEach(s => {
+                        const color = s.LGHT_COL_CD === "1" ? "#00E676" : "#FF1744";
+                        const content = `<div class="timer-box" style="background:${color}">${s.RESID_TIME}s</div>`;
+                        
+                        const overlay = new kakao.maps.CustomOverlay({
+                            map: map,
+                            position: new kakao.maps.LatLng(s.LAT, s.LNG),
+                            content: content,
+                            yAnchor: 1.5
+                        });
+                        signalOverlays.push(overlay);
                     });
-                    overlay.setMap(map);
-                    signalOverlays.push(overlay);
-                });
-            } catch (e) { console.log(e); }
-        }
+                } catch (e) { console.error("신호 실패", e); }
+            }
 
-        // [함수] 버스 정류장 표시
-        async function loadStations() {
-            const res = await fetch(`/api/stations?lat=${CENTER.lat}&lng=${CENTER.lng}`);
-            const data = await res.json();
-            data.documents.forEach(p => {
-                new kakao.maps.Marker({ map, position: new kakao.maps.LatLng(p.y, p.x), image: busImg, title: p.place_name });
-            });
-        }
+            // 3. 버스 정류장 로드
+            async function loadStations() {
+                try {
+                    const res = await fetch(`/api/stations?lat=${MY_LAT}&lng=${MY_LNG}`);
+                    const data = await res.json();
+                    data.documents.forEach(p => {
+                        new kakao.maps.Marker({
+                            map: map,
+                            position: new kakao.maps.LatLng(p.y, p.x),
+                            image: busImg,
+                            title: p.place_name
+                        });
+                    });
+                } catch (e) { console.error("정류소 실패", e); }
+            }
 
-        // [함수] 날씨 표시
-        async function loadWeather() {
-            const res = await fetch(`/api/weather?lat=${CENTER.lat}&lng=${CENTER.lng}`);
-            const data = await res.json();
-            document.getElementById('weather').innerText = `🌡️ ${Math.round(data.main.temp)}°C / ${data.weather[0].description}`;
-        }
-
-        // 실행
-        loadWeather();
-        loadStations();
-        updateSignals();
-        setInterval(updateSignals, 1000); // 1초마다 신호 갱신
+            // 실행 및 주기적 업데이트
+            loadWeather();
+            loadStations();
+            loadSignals();
+            setInterval(loadSignals, 1000); // 1초마다 타이머 갱신
+        });
     </script>
 </body>
 </html>
