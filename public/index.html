@@ -23,7 +23,7 @@
     .w-icon { font-size: 22px; }
     #map { width: 100vw; height: 100vh; }
     .btn-location {
-      position: fixed; right: 16px; bottom: 240px; z-index: 15;
+      position: fixed; right: 16px; bottom: 260px; z-index: 15;
       width: 46px; height: 46px; border-radius: 50%;
       background: #1a1a1a; border: 1px solid #2a2a2a;
       box-shadow: 0 4px 16px rgba(0,0,0,0.5);
@@ -67,23 +67,32 @@
       border-top: 1px solid rgba(255,255,255,0.07);
       padding: 14px 16px 20px;
     }
-    .signal-row {
-      display: flex; align-items: center; justify-content: space-between;
+
+    /* 신호등 두 개 표시 */
+    .signal-list {
+      display: flex; flex-direction: column; gap: 8px;
       padding-bottom: 12px; margin-bottom: 12px;
       border-bottom: 1px solid rgba(255,255,255,0.06);
     }
-    .s-left { display: flex; align-items: center; gap: 8px; }
-    .s-dot  { width: 12px; height: 12px; border-radius: 50%; background: #333; transition: background 0.4s; }
-    .s-dot.green { background: #00e676; box-shadow: 0 0 8px #00e676; animation: blink 1.4s infinite; }
-    .s-dot.red   { background: #ff1744; box-shadow: 0 0 8px #ff1744; animation: blink 1.4s infinite; }
+    .signal-item {
+      display: flex; align-items: center; justify-content: space-between;
+      background: rgba(255,255,255,0.04); border-radius: 10px; padding: 8px 12px;
+    }
+    .signal-item .si-left { display: flex; align-items: center; gap: 8px; }
+    .signal-item .si-dot  { width: 10px; height: 10px; border-radius: 50%; background: #333; }
+    .signal-item .si-dot.green { background: #00e676; box-shadow: 0 0 6px #00e676; animation: blink 1.4s infinite; }
+    .signal-item .si-dot.red   { background: #ff1744; box-shadow: 0 0 6px #ff1744; animation: blink 1.4s infinite; }
     @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.35} }
-    .s-name   { font-size: 13px; font-weight: 700; color: #fff; }
-    .s-status { font-size: 12px; font-weight: 700; color: #555; }
-    .s-status.green { color: #00e676; }
-    .s-status.red   { color: #ff1744; }
-    .s-time   { font-size: 10px; color: #444; margin-top: 2px; text-align: right; }
+    .signal-item .si-name  { font-size: 12px; font-weight: 700; color: #fff; }
+    .signal-item .si-sim   { font-size: 10px; color: #555; margin-left: 4px; }
+    .signal-item .si-right { text-align: right; }
+    .signal-item .si-status { font-size: 11px; font-weight: 700; color: #555; }
+    .signal-item .si-status.green { color: #00e676; }
+    .signal-item .si-status.red   { color: #ff1744; }
+    .signal-item .si-time { font-size: 10px; color: #444; margin-top: 2px; }
+
     .bus-title { font-size: 10px; color: #555; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px; }
-    .bus-list  { display: flex; flex-direction: column; gap: 6px; max-height: 120px; overflow-y: auto; }
+    .bus-list  { display: flex; flex-direction: column; gap: 6px; max-height: 100px; overflow-y: auto; }
     .bus-item  {
       display: flex; align-items: center;
       background: rgba(255,255,255,0.04); border-radius: 10px; padding: 8px 12px;
@@ -120,16 +129,12 @@
   <button class="btn-location" id="btn-loc">📍</button>
 
   <div class="panel">
-    <div class="signal-row">
-      <div class="s-left">
-        <div class="s-dot" id="s-dot"></div>
-        <div class="s-name" id="s-name">신호 정보 로딩 중</div>
-      </div>
-      <div style="text-align:right">
-        <div class="s-status" id="s-status">--</div>
-        <div class="s-time" id="s-time">--:--:--</div>
-      </div>
+    <!-- 신호등 두 개 목록 -->
+    <div class="signal-list" id="signal-list">
+      <div style="color:#555;font-size:12px;padding:4px">신호 정보 로딩 중...</div>
     </div>
+
+    <!-- 버스 도착 -->
     <div class="bus-title" id="bus-title">🚌 버스 도착 정보 — 정류장을 선택하세요</div>
     <div class="bus-list" id="bus-list">
       <div style="color:#555;font-size:12px;padding:8px">지도에서 🚏 정류장 마커를 클릭하세요</div>
@@ -141,8 +146,6 @@
   <script>
     var BASE    = "https://suyu-signal.onrender.com";
     var CENTER  = { lat: 37.625395, lng: 127.037088 };
-
-    // 횡단보도 두 곳 좌표
     var CROSSINGS = [
       { lat: 37.625428, lng: 127.037069 },
       { lat: 37.625226, lng: 127.037151 }
@@ -153,17 +156,14 @@
       level: 3
     });
 
-    var sDot     = document.getElementById("s-dot");
-    var sName    = document.getElementById("s-name");
-    var sStatus  = document.getElementById("s-status");
-    var sTime    = document.getElementById("s-time");
-    var busList  = document.getElementById("bus-list");
-    var busTitle = document.getElementById("bus-title");
-    var wIcon    = document.getElementById("w-icon");
-    var wTemp    = document.getElementById("w-temp");
-    var wDesc    = document.getElementById("w-desc");
-    var toastEl  = document.getElementById("toast");
-    var btnLoc   = document.getElementById("btn-loc");
+    var signalList  = document.getElementById("signal-list");
+    var busList     = document.getElementById("bus-list");
+    var busTitle    = document.getElementById("bus-title");
+    var wIcon       = document.getElementById("w-icon");
+    var wTemp       = document.getElementById("w-temp");
+    var wDesc       = document.getElementById("w-desc");
+    var toastEl     = document.getElementById("toast");
+    var btnLoc      = document.getElementById("btn-loc");
 
     var sigOverlays     = [];
     var locOverlay      = null;
@@ -212,44 +212,51 @@
 
     function setSignalMarkers(rows) {
       clearSignalOverlays();
+      var panelHtml = "";
 
       rows.forEach(function(row, i) {
-        var sec        = Number(row.RESID_TIME);
-        var isGreen    = row.LGHT_COL_CD == "1";
+        var sec         = Number(row.RESID_TIME);
+        var isGreen     = row.LGHT_COL_CD == "1";
         var isSimulated = row.SIMULATED === true;
-        var c          = isGreen ? "green" : "red";
-        var e          = isGreen ? "🟢" : "🔴";
-        var simTag     = isSimulated ? '<div class="s-sim">* 예측값</div>' : '';
+        var c           = isGreen ? "green" : "red";
+        var e           = isGreen ? "🟢" : "🔴";
+        var name        = row.ITRSC_NM || ("오현로20길 교차로 " + (i === 0 ? "A" : "B"));
+        var simTag      = isSimulated ? '<div class="s-sim">* 예측값</div>' : '';
+        var now         = new Date().toLocaleTimeString("ko-KR", { hour12: false });
 
-        // 좌표: 데이터에 있으면 사용, 없으면 CROSSINGS 배열 사용
         var lat = (row.LAT && row.LAT !== "") ? Number(row.LAT) : CROSSINGS[i] ? CROSSINGS[i].lat : CENTER.lat;
         var lng = (row.LNG && row.LNG !== "") ? Number(row.LNG) : CROSSINGS[i] ? CROSSINGS[i].lng : CENTER.lng;
 
+        // 지도 마커
         var overlay = new kakao.maps.CustomOverlay({
           position: new kakao.maps.LatLng(lat, lng),
           content: '<div class="signal-bubble ' + c + '">'
             + '<span class="s-emoji">' + e + '</span>'
             + '<div class="s-sec">' + sec + '</div>'
             + '<div class="s-label">초 남음</div>'
-            + simTag
-            + '</div>',
+            + simTag + '</div>',
           yAnchor: 1.3
         });
         overlay.setMap(map);
         sigOverlays.push(overlay);
 
-        // 첫 번째 신호등 기준으로 하단 패널 업데이트
-        if (i === 0) {
-          sDot.className      = "s-dot " + c;
-          sName.textContent   = (row.ITRSC_NM || "오현로20길 교차로") + (isSimulated ? " (예측)" : "");
-          sStatus.textContent = isGreen ? "🟢 녹색 신호" : "🔴 적색 신호";
-          sStatus.className   = "s-status " + c;
-          sTime.textContent   = new Date().toLocaleTimeString("ko-KR", { hour12: false });
-        }
+        // 하단 패널 아이템
+        panelHtml += '<div class="signal-item">'
+          + '<div class="si-left">'
+          + '<div class="si-dot ' + c + '"></div>'
+          + '<span class="si-name">' + name + '</span>'
+          + (isSimulated ? '<span class="si-sim">(예측)</span>' : '')
+          + '</div>'
+          + '<div class="si-right">'
+          + '<div class="si-status ' + c + '">' + (isGreen ? "🟢 녹색 " : "🔴 적색 ") + sec + "초</div>"
+          + '<div class="si-time">' + now + '</div>'
+          + '</div>'
+          + '</div>';
       });
+
+      signalList.innerHTML = panelHtml || '<div style="color:#555;font-size:12px;padding:4px">신호 정보 없음</div>';
     }
 
-    var sigErr = 0;
     async function updateSignal() {
       try {
         var r = await fetch(BASE + "/api/signal");
@@ -257,11 +264,8 @@
         var d = await r.json();
         if (!d || !d.SptTrafficLghtResidTime || !d.SptTrafficLghtResidTime.row || !d.SptTrafficLghtResidTime.row.length) throw new Error();
         setSignalMarkers(d.SptTrafficLghtResidTime.row);
-        sigErr = 0;
       } catch(e) {
-        sigErr++;
-        sDot.className      = "s-dot";
-        sStatus.textContent = "수신 불가";
+        signalList.innerHTML = '<div style="color:#555;font-size:12px;padding:4px">신호 수신 불가</div>';
       }
       setTimeout(updateSignal, 2000);
     }
