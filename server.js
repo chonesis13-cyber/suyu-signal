@@ -4,12 +4,12 @@ const cors = require("cors");
 let fetch;
 (async () => { fetch = (await import("node-fetch")).default; })();
 
-const app = express();
+const app  = express();
 const PORT = process.env.PORT || 3000;
 
-const SEOUL_API_KEY  = "58456c6f4d61737435384d664d5943";
-const BUS_API_KEY = "f1786639cd3d3785e1866ee164273ef747d3f5e5a7f5a6b34177bb90c3d1af4f";
-const SEOUL_API_URL  = `http://openAPI.seoul.go.kr:8088/${SEOUL_API_KEY}/json/SptTrafficLghtResidTime/1/5/`;
+const SEOUL_KEY   = "58456c6f4d61737435384d664d5943";
+const BUS_KEY     = "f1786639cd3d3785e1866ee164273ef747d3f5e5a7f5a6b34177bb90c3d1af4f";
+const WEATHER_KEY = "af228254ffa0eb85c2d1ffced047cb05";
 
 const BUS_STATIONS = [
   { name: "북부수도사업소",   arsId: "09154", buses: ["1124"] },
@@ -23,13 +23,12 @@ app.use(express.static("public"));
 app.get("/api/signal", async (req, res) => {
   if (!fetch) return res.status(503).json({ error: "서버 초기화 중" });
   try {
-    const response = await fetch(SEOUL_API_URL, { headers: { Accept: "application/json" } });
-    if (!response.ok) throw new Error(`서울시 API 오류: ${response.status}`);
-    const data = await response.json();
-    if (data.RESULT) return res.status(502).json({ error: data.RESULT.MESSAGE });
-    res.json(data);
-  } catch (err) {
-    res.status(502).json({ error: err.message });
+    const r = await fetch(`http://openAPI.seoul.go.kr:8088/${SEOUL_KEY}/json/SptTrafficLghtResidTime/1/5/`);
+    const d = await r.json();
+    if (d.RESULT) return res.status(502).json({ error: d.RESULT.MESSAGE });
+    res.json(d);
+  } catch (e) {
+    res.status(502).json({ error: e.message });
   }
 });
 
@@ -39,21 +38,30 @@ app.get("/api/bus", async (req, res) => {
   try {
     const results = await Promise.all(
       BUS_STATIONS.map(async (station) => {
-        const url = `http://ws.bus.go.kr/api/rest/stationinfo/getStationByUid?arsId=${station.arsId}&serviceKey=${BUS_API_KEY}&resultType=json`;
-        const response = await fetch(url, { headers: { Accept: "application/json" } });
-        if (!response.ok) throw new Error(`버스 API 오류: ${response.status}`);
-        const data = await response.json();
-        return {
-          stationName: station.name,
-          arsId: station.arsId,
-          buses: station.buses,
-          data: data
-        };
+        const url = `http://ws.bus.go.kr/api/rest/stationinfo/getStationByUid?arsId=${station.arsId}&serviceKey=${BUS_KEY}&resultType=json`;
+        const r = await fetch(url);
+        const d = await r.json();
+        return { stationName: station.name, arsId: station.arsId, buses: station.buses, data: d };
       })
     );
     res.json({ stations: results });
-  } catch (err) {
-    res.status(502).json({ error: err.message });
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
+});
+
+// 날씨 API
+app.get("/api/weather", async (req, res) => {
+  if (!fetch) return res.status(503).json({ error: "서버 초기화 중" });
+  const { lat, lng } = req.query;
+  if (!lat || !lng) return res.status(400).json({ error: "위치 정보 필요" });
+  try {
+    const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&appid=${WEATHER_KEY}&units=metric&lang=kr`;
+    const r = await fetch(url);
+    const d = await r.json();
+    res.json(d);
+  } catch (e) {
+    res.status(502).json({ error: e.message });
   }
 });
 
