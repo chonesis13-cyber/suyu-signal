@@ -28,8 +28,7 @@ function getSignalData() {
   const aIsGreen  = elapsed < GREEN_SEC;
   const aResid    = aIsGreen ? GREEN_SEC - elapsed : CYCLE - elapsed;
   const bIsGreen  = !aIsGreen;
-  const bResid    = bIsGreen ? GREEN_SEC - (elapsed - GREEN_SEC) : GREEN_SEC - elapsed + (CYCLE - GREEN_SEC);
-
+  const bResid    = bIsGreen ? (CYCLE - elapsed) : (GREEN_SEC - elapsed);
   return [
     {
       ITRSC_NM: CROSSINGS[0].name,
