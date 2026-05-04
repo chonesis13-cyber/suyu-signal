@@ -28,7 +28,7 @@ function getSignalData() {
   const aIsGreen  = elapsed < GREEN_SEC;
   const aResid    = aIsGreen ? GREEN_SEC - elapsed : CYCLE - elapsed;
   const bIsGreen  = !aIsGreen;
-  const bResid    = Math.max(1, bIsGreen ? (CYCLE - elapsed) : (GREEN_SEC - elapsed));
+const bResid    = Math.max(1, bIsGreen ? GREEN_SEC - (elapsed - GREEN_SEC) : GREEN_SEC + (CYCLE - elapsed));
   return [
     {
       ITRSC_NM: CROSSINGS[0].name,
