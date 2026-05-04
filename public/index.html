@@ -2,73 +2,72 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Suyu-Signal 지도 서비스</title>
-    <!-- 카카오 지도 API (발급받은 JavaScript 키를 넣으세요) -->
+    <title>Suyu-Signal 지도 & 날씨</title>
     <script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=발급받은_자바스크립트_키_입력"></script>
     <style>
-        body { margin: 0; padding: 0; }
-        #map { width: 100%; height: 100vh; } /* 전체 화면 지도 */
-        .info-panel { position: absolute; top: 10px; left: 10px; z-index: 10; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+        body { margin: 0; padding: 0; font-family: sans-serif; }
+        #map { width: 100%; height: 100vh; }
+        .info-panel { 
+            position: absolute; top: 10px; left: 10px; z-index: 10; 
+            background: rgba(255, 255, 255, 0.9); padding: 15px; 
+            border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); 
+        }
+        #weather-info { margin-top: 10px; font-weight: bold; color: #0052CC; }
     </style>
 </head>
 <body>
 
     <div class="info-panel">
         <h3>수유 신호등 프로젝트</h3>
-        <p>파란색 마커가 버스 정류장입니다.</p>
+        <div id="weather-info">날씨 불러오는 중...</div>
     </div>
     
     <div id="map"></div>
 
     <script>
-        // 1. 지도 초기화 (오현로20길 교차로 중심)
-        const container = document.getElementById('map');
-        const options = {
-            center: new kakao.maps.LatLng(37.6254, 127.0370),
+        const lat = 37.6254;
+        const lng = 127.0370;
+
+        // 1. 지도 설정
+        const map = new kakao.maps.Map(document.getElementById('map'), {
+            center: new kakao.maps.LatLng(lat, lng),
             level: 3
-        };
-        const map = new kakao.maps.Map(container, options);
+        });
 
-        // 2. 커스텀 버스 마커 이미지 (SVG Data URI)
-        // 재상님이 원하셨던 '이미지 없이 버스 마커 만들기' 핵심 부분입니다.
-        const busIconSvg = `data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cGF0aCBmaWxsPSIjMDA1MkNDIiBkPSJNNDg4IDEyOEg0MGMtMjIuMSAwLTQwIDE3LjktNDAgNDB2MjU2YzAgMjIuMSAxNy45IDQwIDQwIDQwaDQ0OGMyMi4xIDAgNDAtMTcuOSA0MC00MFYxNjhjMC0yMi4xLTE3LjktNDAtNDAtNDB6TTEyOCAzNTJjLTE3LjcgMC0zMi0xNC4zLTMyLTMyczE0LjMtMzIgMzItMzIgMzIgMTQuMyAzMiAzMi0xNC4zIDMyLTMyIDMyem0yNTYgMGMtMTcxIDAtMzItMTQuMy0zMi0zMnMxNC4zLTMyIDMyLTMyIDMyIDE0LjMgMzIgMzItMTQuMyAzMi0zMiAzMnoiLz48L3N2Zz4=`;
-        const busImageSize = new kakao.maps.Size(35, 35);
-        const busMarkerImage = new kakao.maps.MarkerImage(busIconSvg, busImageSize);
+        // 2. 버스 마커 설정
+        const busIconSvg = `data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cGF0aCBmaWxsPSIjMDA1MkNDIiBkPSJNNDg4IDEyOEg0MGMtMjIuMSAwLTQwIDE3LjktNDAgNDB2MjU2YzAgMjIuMSAxNy45IDQwIDQwIDQwaDQ0OGMyMi41IDAgNDAtMTcuOSA0MC00MFYxNjhjMC0yMi4xLTE3LjktNDAtNDAtNDB6TTEyOCAzNTJjLTE3LjcgMC0zMi0xNC4zLTMyLTMyczE0LjMtMzIgMzItMzIgMzIgMTQuMyAzMiAzMi0xNC4zIDMyLTMyIDMyem0yNTYgMGMtMTcxIDAtMzItMTQuMy0zMi0zMnMxNC4zLTMyIDMyLTMyIDMyIDE0LjMgMzIgMzItMTQuMyAzMi0zMiAzMnoiLz48L3N2Zz4=`;
+        const busMarkerImage = new kakao.maps.MarkerImage(busIconSvg, new kakao.maps.Size(35, 35));
 
-        // 3. 정류장 데이터를 가져와서 마커 찍기
-        async function fetchAndMarkStations() {
+        // 3. 날씨 정보 가져오기 함수
+        async function loadWeather() {
             try {
-                const lat = 37.6254;
-                const lng = 127.0370;
-                const res = await fetch(`/api/stations?lat=${lat}&lng=${lng}`);
+                const res = await fetch(`/api/weather?lat=${lat}&lng=${lng}`);
                 const data = await res.json();
-
-                if (data.documents) {
-                    data.documents.forEach(station => {
-                        // 각 정류장 위치에 버스 모양 마커 생성
-                        const marker = new kakao.maps.Marker({
-                            map: map,
-                            position: new kakao.maps.LatLng(station.y, station.x),
-                            image: busMarkerImage, // 우리가 만든 버스 아이콘 적용
-                            title: station.place_name
-                        });
-
-                        // 클릭 시 정류장 이름 표시 (선택사항)
-                        const infowindow = new kakao.maps.InfoWindow({
-                            content: `<div style="padding:5px;font-size:12px;">${station.place_name}</div>`
-                        });
-                        kakao.maps.event.addListener(marker, 'click', () => {
-                            infowindow.open(map, marker);
-                        });
-                    });
-                }
-            } catch (err) {
-                console.error("데이터 로드 중 오류:", err);
+                const temp = data.main.temp;
+                const desc = data.weather[0].description;
+                document.getElementById('weather-info').innerText = `🌡️ 현재 기온: ${temp}°C (${desc})`;
+            } catch (e) {
+                document.getElementById('weather-info').innerText = "날씨 정보 실패";
             }
         }
 
+        // 4. 정류장 마커 가져오기
+        async function loadStations() {
+            const res = await fetch(`/api/stations?lat=${lat}&lng=${lng}`);
+            const data = await res.json();
+            data.documents.forEach(station => {
+                new kakao.maps.Marker({
+                    map: map,
+                    position: new kakao.maps.LatLng(station.y, station.x),
+                    image: busMarkerImage,
+                    title: station.place_name
+                });
+            });
+        }
+
         // 실행
-        fetchAndMarkStations();
+        loadWeather();
+        loadStations();
     </script>
 </body>
 </html>
