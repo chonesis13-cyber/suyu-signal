@@ -35,7 +35,7 @@
       background: #1a1a1a; border: 2px solid #333;
       border-radius: 14px; padding: 8px 12px;
       text-align: center; min-width: 68px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.6); cursor: pointer;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.6);
     }
     .signal-bubble.green { border-color: #00e676; }
     .signal-bubble.red   { border-color: #ff1744; }
@@ -164,11 +164,12 @@
     let myLat = CENTER.lat, myLng = CENTER.lng;
     let searchTimer = null;
 
-    function toast(msg, type = "err") {
+    function toast(msg, type) {
+      type = type || "err";
       toastEl.textContent   = msg;
-      toastEl.className     = `toast ${type}`;
+      toastEl.className     = "toast " + type;
       toastEl.style.display = "block";
-      setTimeout(() => toastEl.style.display = "none", 3500);
+      setTimeout(function() { toastEl.style.display = "none"; }, 3500);
     }
 
     function weatherEmoji(id) {
@@ -185,27 +186,25 @@
 
     async function updateWeather(lat, lng) {
       try {
-        const r = await fetch(`${BASE}/api/weather?lat=${lat}&lng=${lng}`);
-        const d = await r.json();
+        var r = await fetch(BASE + "/api/weather?lat=" + lat + "&lng=" + lng);
+        var d = await r.json();
         if (d.cod !== 200) throw new Error();
         wTemp.textContent = Math.round(d.main.temp) + "°C";
         wDesc.textContent = d.weather[0].description;
         wIcon.textContent = weatherEmoji(d.weather[0].id);
-      } catch { wDesc.textContent = "날씨 정보 없음"; }
-      finally  { setTimeout(() => updateWeather(myLat, myLng), 600000); }
+      } catch(e) {
+        wDesc.textContent = "날씨 정보 없음";
+      }
+      setTimeout(function() { updateWeather(myLat, myLng); }, 600000);
     }
 
     function setSignalMarker(lat, lng, sec, isGreen, name) {
-      const c = isGreen ? "green" : "red";
-      const e = isGreen ? "🟢" : "🔴";
+      var c = isGreen ? "green" : "red";
+      var e = isGreen ? "🟢" : "🔴";
       if (sigOverlay) sigOverlay.setMap(null);
       sigOverlay = new kakao.maps.CustomOverlay({
         position: new kakao.maps.LatLng(lat, lng),
-        content: `<div class="signal-bubble ${c}">
-          <span class="s-emoji">${e}</span>
-          <div class="s-sec">${sec}</div>
-          <div class="s-label">초 남음</div>
-        </div>`,
+        content: '<div class="signal-bubble ' + c + '"><span class="s-emoji">' + e + '</span><div class="s-sec">' + sec + '</div><div class="s-label">초 남음</div></div>',
         yAnchor: 1.3
       });
       sigOverlay.setMap(map);
@@ -216,65 +215,50 @@
       sTime.textContent   = new Date().toLocaleTimeString("ko-KR", { hour12: false });
     }
 
-    let sigErr = 0;
+    var sigErr = 0;
     async function updateSignal() {
       try {
-        const r = await fetch(`${BASE}/api/signal`);
+        var r = await fetch(BASE + "/api/signal");
         if (!r.ok) throw new Error();
-        const d = await r.json();
-        if (!d?.SptTrafficLghtResidTime?.row?.length) throw new Error();
-        const row     = d.SptTrafficLghtResidTime.row[0];
-        const sec     = Number(row.RESID_TIME);
-        const isGreen = row.LGHT_COL_CD == "1";
-        const name    = row.ITRSC_NM || row.INTRSEC_NM || "수유역 교차로";
-        const lat     = row.LAT ? Number(row.LAT) : CENTER.lat;
-        const lng     = row.LNG ? Number(row.LNG) : CENTER.lng;
+        var d = await r.json();
+        if (!d || !d.SptTrafficLghtResidTime || !d.SptTrafficLghtResidTime.row || !d.SptTrafficLghtResidTime.row.length) throw new Error();
+        var row     = d.SptTrafficLghtResidTime.row[0];
+        var sec     = Number(row.RESID_TIME);
+        var isGreen = row.LGHT_COL_CD == "1";
+        var name    = row.ITRSC_NM || row.INTRSEC_NM || "수유역 교차로";
+        var lat     = row.LAT ? Number(row.LAT) : CENTER.lat;
+        var lng     = row.LNG ? Number(row.LNG) : CENTER.lng;
         setSignalMarker(lat, lng, sec, isGreen, name);
         sigErr = 0;
-      } catch {
+      } catch(e) {
         sigErr++;
         sDot.className      = "s-dot";
         sStatus.textContent = "수신 불가";
-      } finally {
-        setTimeout(updateSignal, 2000);
       }
+      setTimeout(updateSignal, 2000);
     }
 
-    // 카카오 장소검색으로 근처 버스정류장 찾기
-    const ps = new kakao.maps.services.Places();
+    var ps = new kakao.maps.services.Places();
 
     function clearStationOverlays() {
-      stationOverlays.forEach(o => o.setMap(null));
+      stationOverlays.forEach(function(o) { o.setMap(null); });
       stationOverlays = [];
     }
 
+    function showStation(name) {
+      busTitle.textContent = "🚌 " + name;
+      busList.innerHTML = '<div style="color:#555;font-size:12px;padding:8px">버스 API 연동 준비 중...</div>';
+    }
+
     function loadNearbyStations() {
-  const center = map.getCenter();
-  ps.categorySearch("SW8", (data, status) => {
-    if (status !== kakao.maps.services.Status.OK) return;
-    clearStationOverlays();
-    data.forEach(place => {
-      const overlay = new kakao.maps.CustomOverlay({
-        position: new kakao.maps.LatLng(place.y, place.x),
-        content: `<div class="bus-marker" onclick="showStation('${place.place_name}')">🚏 ${place.place_name}</div>`,
-        yAnchor: 1.3
-      });
-      overlay.setMap(map);
-      stationOverlays.push(overlay);
-    });
-  }, {
-    location: center,
-    radius: 500,
-    sort: kakao.maps.services.SortBy.DISTANCE
-  });
-} (data, status) => {
+      var center = map.getCenter();
+      ps.keywordSearch("버스정류장", function(data, status) {
         if (status !== kakao.maps.services.Status.OK) return;
         clearStationOverlays();
-        data.forEach(place => {
-          if (!place.category_name.includes("교통") && !place.place_name.includes("정류")) return;
-          const overlay = new kakao.maps.CustomOverlay({
+        data.forEach(function(place) {
+          var overlay = new kakao.maps.CustomOverlay({
             position: new kakao.maps.LatLng(place.y, place.x),
-            content: `<div class="bus-marker" onclick="showStation('${place.place_name}')">🚏 ${place.place_name}</div>`,
+            content: '<div class="bus-marker" onclick="showStation(\'' + place.place_name + '\')">🚏 ' + place.place_name + '</div>',
             yAnchor: 1.3
           });
           overlay.setMap(map);
@@ -286,16 +270,12 @@
       });
     }
 
-    function showStation(name) {
-      busTitle.textContent = `🚌 ${name}`;
-      busList.innerHTML = `<div style="color:#555;font-size:12px;padding:8px">버스 API 연동 준비 중...</div>`;
-    }
-
-    kakao.maps.event.addListener(map, "dragend", () => {
+    kakao.maps.event.addListener(map, "dragend", function() {
       clearTimeout(searchTimer);
       searchTimer = setTimeout(loadNearbyStations, 500);
     });
-    kakao.maps.event.addListener(map, "zoom_changed", () => {
+
+    kakao.maps.event.addListener(map, "zoom_changed", function() {
       clearTimeout(searchTimer);
       searchTimer = setTimeout(loadNearbyStations, 500);
     });
@@ -305,18 +285,19 @@
       if (locOverlay) locOverlay.setMap(null);
       locOverlay = new kakao.maps.CustomOverlay({
         position: new kakao.maps.LatLng(lat, lng),
-        content: `<div class="my-dot"></div>`,
+        content: '<div class="my-dot"></div>',
         yAnchor: 0.5
       });
       locOverlay.setMap(map);
     }
 
-    btnLoc.addEventListener("click", () => {
+    btnLoc.addEventListener("click", function() {
       if (!navigator.geolocation) { toast("위치 기능 미지원"); return; }
       toast("📍 위치 찾는 중...", "info");
       navigator.geolocation.getCurrentPosition(
-        pos => {
-          const { latitude: lat, longitude: lng } = pos.coords;
+        function(pos) {
+          var lat = pos.coords.latitude;
+          var lng = pos.coords.longitude;
           setMyLocation(lat, lng);
           map.setCenter(new kakao.maps.LatLng(lat, lng));
           map.setLevel(3);
@@ -324,7 +305,7 @@
           loadNearbyStations();
           toast("📍 현재 위치로 이동", "info");
         },
-        () => toast("위치 권한을 허용해주세요")
+        function() { toast("위치 권한을 허용해주세요"); }
       );
     });
 
