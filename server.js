@@ -9,7 +9,7 @@ const app  = express();
 const PORT = process.env.PORT || 3000;
 
 const SEOUL_KEY   = "58456c6f4d61737435384d664d5943";
-const BUS_KEY     = "f1786639cd3d3785e1866ee164273ef747d3f5e5a7f5a6b34177bb90c3d1af4f";
+const KAKAO_REST  = "b9430d7f52d1000a6038b7eb6402cccc";
 const WEATHER_KEY = "af228254ffa0eb85c2d1ffced047cb05";
 
 app.use(cors({ origin: "*" }));
@@ -25,27 +25,16 @@ app.get("/api/signal", async (req, res) => {
   } catch (e) { res.status(502).json({ error: e.message }); }
 });
 
-// 근처 정류장 검색
+// 카카오 근처 버스정류장 검색
 app.get("/api/stations", async (req, res) => {
   if (!fetch) return res.status(503).json({ error: "서버 초기화 중" });
   const { lat, lng } = req.query;
   if (!lat || !lng) return res.status(400).json({ error: "위치 정보 필요" });
   try {
-    const url = `http://ws.bus.go.kr/api/rest/stationinfo/getStationsByPos?tmX=${lng}&tmY=${lat}&radius=500&serviceKey=${BUS_KEY}&resultType=json`;
-    const r = await fetch(url);
-    const d = await r.json();
-    res.json(d);
-  } catch (e) { res.status(502).json({ error: e.message }); }
-});
-
-// 버스 도착 정보
-app.get("/api/bus", async (req, res) => {
-  if (!fetch) return res.status(503).json({ error: "서버 초기화 중" });
-  const { arsId } = req.query;
-  if (!arsId) return res.status(400).json({ error: "정류장 ID 필요" });
-  try {
-    const url = `http://ws.bus.go.kr/api/rest/stationinfo/getStationByUid?arsId=${arsId}&serviceKey=${BUS_KEY}&resultType=json`;
-    const r = await fetch(url);
+    const url = `https://dapi.kakao.com/v2/local/search/keyword.json?query=버스정류장&x=${lng}&y=${lat}&radius=500&size=15`;
+    const r = await fetch(url, {
+      headers: { Authorization: `KakaoAK ${KAKAO_REST}` }
+    });
     const d = await r.json();
     res.json(d);
   } catch (e) { res.status(502).json({ error: e.message }); }
