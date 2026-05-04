@@ -45,8 +45,8 @@ app.get("/api/signal", async (req, res) => {
         ITRSC_NM: "수유역 교차로",
         LGHT_COL_CD: isGreen ? "1" : "2",
         RESID_TIME: residTime,
-        LAT: "37.6489",
-        LNG: "127.0277",
+       LAT: "",
+       LNG: "",
         SIMULATED: true
       }]
     }
