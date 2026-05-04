@@ -236,7 +236,7 @@
         var row        = d.SptTrafficLghtResidTime.row[0];
         var sec        = Number(row.RESID_TIME);
         var isGreen    = row.LGHT_COL_CD == "1";
-        var name       = row.ITRSC_NM || row.INTRSEC_NM || "오현로20길 교차로";
+        var name = row.ITRSC_NM || row.INTRSEC_NM || "오현로20길 교차로";
         var isSimulated = row.SIMULATED === true;
 
         // 실시간 데이터면 해당 좌표, 시뮬레이션이면 수유역 교차로 위치 사용
