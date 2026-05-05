@@ -95,8 +95,6 @@
     .si-status.green { color: #00e676; }
     .si-status.red   { color: #ff1744; }
     .si-time  { font-size: 10px; color: #444; margin-top: 2px; }
-
-    /* 지하철 섹션 */
     .section-title { font-size: 10px; color: #555; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 6px; }
     .subway-list {
       display: flex; flex-direction: column; gap: 5px;
@@ -112,8 +110,6 @@
     .subway-dir  { font-size: 11px; color: #888; flex: 1; }
     .subway-time { font-size: 12px; font-weight: 700; color: #ffcc80; text-align: right; white-space: nowrap; }
     .subway-time.soon { color: #ff6b35; }
-
-    /* 버스 섹션 */
     .bus-list { display: flex; flex-direction: column; gap: 5px; max-height: 80px; overflow-y: auto; }
     .bus-item {
       display: flex; align-items: center;
@@ -122,7 +118,6 @@
     .bus-no { font-size: 12px; font-weight: 800; color: #fff; background: #1e3a5f; padding: 2px 7px; border-radius: 6px; margin-right: 8px; white-space: nowrap; }
     .bus-stop  { font-size: 11px; color: #555; flex: 1; }
     .bus-arrive { font-size: 12px; font-weight: 700; color: #82b1ff; text-align: right; white-space: nowrap; }
-
     .toast {
       position: fixed; top: 64px; left: 50%; transform: translateX(-50%);
       border-radius: 20px; padding: 8px 18px; font-size: 12px;
@@ -149,18 +144,13 @@
   <button class="btn-location" id="btn-loc">📍</button>
 
   <div class="panel">
-    <!-- 신호등 -->
     <div class="signal-list" id="signal-list">
       <div style="color:#555;font-size:12px;padding:4px">신호 정보 로딩 중...</div>
     </div>
-
-    <!-- 지하철 -->
-    <div class="section-title">🚇 근처 지하철 도착 정보</div>
+    <div class="section-title" id="subway-title">🚇 근처 지하철 도착 정보</div>
     <div class="subway-list" id="subway-list">
       <div style="color:#555;font-size:12px;padding:4px">지도를 움직이면 근처 역 정보가 표시됩니다</div>
     </div>
-
-    <!-- 버스 -->
     <div class="section-title">🚌 버스 도착 정보</div>
     <div class="bus-list" id="bus-list">
       <div style="color:#555;font-size:12px;padding:4px">지도에서 🚏 정류장 마커를 클릭하세요</div>
@@ -184,6 +174,7 @@
 
     var signalList  = document.getElementById("signal-list");
     var subwayList  = document.getElementById("subway-list");
+    var subwayTitle = document.getElementById("subway-title");
     var busList     = document.getElementById("bus-list");
     var wIcon       = document.getElementById("w-icon");
     var wTemp       = document.getElementById("w-temp");
@@ -191,10 +182,10 @@
     var toastEl     = document.getElementById("toast");
     var btnLoc      = document.getElementById("btn-loc");
 
-    var sigOverlays     = [];
-    var subwayOverlays  = [];
-    var busOverlays     = [];
-    var locOverlay      = null;
+    var sigOverlays    = [];
+    var subwayOverlays = [];
+    var busOverlays    = [];
+    var locOverlay     = null;
     var myLat = CENTER.lat, myLng = CENTER.lng;
     var searchTimer = null;
     var signalState = [];
@@ -231,7 +222,6 @@
       setTimeout(function() { updateWeather(myLat, myLng); }, 600000);
     }
 
-    // 신호등
     function clearSignalOverlays() {
       sigOverlays.forEach(function(o) { o.setMap(null); });
       sigOverlays = [];
@@ -306,13 +296,15 @@
       setTimeout(updateSignal, 2000);
     }
 
-    // 지하철
-    function clearSubwayOverlays() {
-      subwayOverlays.forEach(function(o) { o.setMap(null); });
-      subwayOverlays = [];
+    // 역 이름 정제 함수
+    function cleanStationName(name) {
+      return name.replace(/\s*\d+호선.*$/, "").replace(/역$/, "").trim();
     }
 
-    async function loadSubwayArrival(stationName) {
+    // 지하철 도착정보
+    async function loadSubwayArrival(stationName, displayName) {
+      subwayTitle.textContent = "🚇 " + (displayName || stationName) + "역 도착 정보";
+      subwayList.innerHTML = '<div style="color:#555;font-size:12px;padding:4px">로딩 중...</div>';
       try {
         var r = await fetch(BASE + "/api/subway?station=" + encodeURIComponent(stationName));
         var d = await r.json();
@@ -324,9 +316,10 @@
         var html = "";
         list.slice(0, 6).forEach(function(item) {
           var isSoon = parseInt(item.barvlDt) < 120;
+          var lineName = item.trainLineNm.split(" - ")[0];
           html += '<div class="subway-item">'
-            + '<span class="subway-line">4호선</span>'
-            + '<span class="subway-dir">' + item.updnLine + ' · ' + item.trainLineNm.split(" - ")[0] + '</span>'
+            + '<span class="subway-line">' + item.updnLine + '</span>'
+            + '<span class="subway-dir">' + lineName + '</span>'
             + '<span class="subway-time ' + (isSoon ? "soon" : "") + '">' + item.arvlMsg2 + '</span>'
             + '</div>';
         });
@@ -334,6 +327,12 @@
       } catch(e) {
         subwayList.innerHTML = '<div style="color:#555;font-size:12px;padding:4px">지하철 정보 수신 실패</div>';
       }
+    }
+
+    // 근처 지하철역 검색
+    function clearSubwayOverlays() {
+      subwayOverlays.forEach(function(o) { o.setMap(null); });
+      subwayOverlays = [];
     }
 
     async function loadNearbySubway() {
@@ -352,15 +351,17 @@
         }
 
         // 가장 가까운 역 자동으로 도착정보 표시
-        var nearest = places[0];
-        var name = place.place_name.replace(/역$/, "").trim();
-        loadSubwayArrival(stationName);
+        var nearest     = places[0];
+        var cleanName   = cleanStationName(nearest.place_name);
+        var displayName = cleanName;
+        loadSubwayArrival(cleanName, displayName);
 
         places.forEach(function(place) {
-          var name = place.place_name.replace("역", "").trim();
+          var clean   = cleanStationName(place.place_name);
+          var display = clean;
           var overlay = new kakao.maps.CustomOverlay({
             position: new kakao.maps.LatLng(place.y, place.x),
-            content: '<div class="subway-marker" onclick="loadSubwayArrival(\'' + name + '\')">🚇 ' + place.place_name + '</div>',
+            content: '<div class="subway-marker" onclick="loadSubwayArrival(\'' + clean + '\',\'' + display + '\')">🚇 ' + place.place_name + '</div>',
             yAnchor: 1.3
           });
           overlay.setMap(map);
@@ -371,7 +372,7 @@
       }
     }
 
-    // 버스
+    // 버스정류장
     function clearBusOverlays() {
       busOverlays.forEach(function(o) { o.setMap(null); });
       busOverlays = [];
