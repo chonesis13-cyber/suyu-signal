@@ -23,7 +23,7 @@
     .w-icon { font-size: 22px; }
     #map { width: 100vw; height: 100vh; }
     .btn-location {
-      position: fixed; right: 16px; bottom: 260px; z-index: 15;
+      position: fixed; right: 16px; bottom: 300px; z-index: 15;
       width: 46px; height: 46px; border-radius: 50%;
       background: #1a1a1a; border: 1px solid #2a2a2a;
       box-shadow: 0 4px 16px rgba(0,0,0,0.5);
@@ -45,6 +45,13 @@
     .signal-bubble.red   .s-sec { color: #ff1744; }
     .signal-bubble .s-label { font-size: 9px; color: #777; margin-top: 2px; }
     .signal-bubble .s-sim { font-size: 8px; color: #555; margin-top: 2px; }
+    .subway-marker {
+      background: #1a1a1a; border: 2px solid #ff9800;
+      border-radius: 10px; padding: 4px 8px;
+      font-size: 11px; font-weight: 700; color: #ffcc80;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.5); cursor: pointer;
+      white-space: nowrap;
+    }
     .bus-marker {
       background: #1a1a1a; border: 2px solid #2979ff;
       border-radius: 10px; padding: 4px 8px;
@@ -68,38 +75,54 @@
       padding: 14px 16px 20px;
     }
     .signal-list {
-      display: flex; flex-direction: column; gap: 8px;
-      padding-bottom: 12px; margin-bottom: 12px;
+      display: flex; flex-direction: column; gap: 6px;
+      padding-bottom: 10px; margin-bottom: 10px;
       border-bottom: 1px solid rgba(255,255,255,0.06);
     }
     .signal-item {
       display: flex; align-items: center; justify-content: space-between;
-      background: rgba(255,255,255,0.04); border-radius: 10px; padding: 8px 12px;
+      background: rgba(255,255,255,0.04); border-radius: 10px; padding: 7px 12px;
     }
-    .signal-item .si-left { display: flex; align-items: center; gap: 8px; }
-    .signal-item .si-dot  { width: 10px; height: 10px; border-radius: 50%; background: #333; }
-    .signal-item .si-dot.green { background: #00e676; box-shadow: 0 0 6px #00e676; animation: blink 1.4s infinite; }
-    .signal-item .si-dot.red   { background: #ff1744; box-shadow: 0 0 6px #ff1744; animation: blink 1.4s infinite; }
+    .si-left { display: flex; align-items: center; gap: 8px; }
+    .si-dot  { width: 10px; height: 10px; border-radius: 50%; background: #333; }
+    .si-dot.green { background: #00e676; box-shadow: 0 0 6px #00e676; animation: blink 1.4s infinite; }
+    .si-dot.red   { background: #ff1744; box-shadow: 0 0 6px #ff1744; animation: blink 1.4s infinite; }
     @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.35} }
-    .signal-item .si-name  { font-size: 12px; font-weight: 700; color: #fff; }
-    .signal-item .si-sim   { font-size: 10px; color: #555; margin-left: 4px; }
-    .signal-item .si-right { text-align: right; }
-    .signal-item .si-status { font-size: 11px; font-weight: 700; color: #555; }
-    .signal-item .si-status.green { color: #00e676; }
-    .signal-item .si-status.red   { color: #ff1744; }
-    .signal-item .si-time { font-size: 10px; color: #444; margin-top: 2px; }
-    .bus-title { font-size: 10px; color: #555; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px; }
-    .bus-list  { display: flex; flex-direction: column; gap: 6px; max-height: 100px; overflow-y: auto; }
-    .bus-item  {
+    .si-name  { font-size: 12px; font-weight: 700; color: #fff; }
+    .si-sim   { font-size: 10px; color: #555; margin-left: 4px; }
+    .si-right { text-align: right; }
+    .si-status { font-size: 11px; font-weight: 700; color: #555; }
+    .si-status.green { color: #00e676; }
+    .si-status.red   { color: #ff1744; }
+    .si-time  { font-size: 10px; color: #444; margin-top: 2px; }
+
+    /* 지하철 섹션 */
+    .section-title { font-size: 10px; color: #555; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 6px; }
+    .subway-list {
+      display: flex; flex-direction: column; gap: 5px;
+      max-height: 90px; overflow-y: auto;
+      padding-bottom: 10px; margin-bottom: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .subway-item {
       display: flex; align-items: center;
-      background: rgba(255,255,255,0.04); border-radius: 10px; padding: 8px 12px;
+      background: rgba(255,255,255,0.04); border-radius: 10px; padding: 7px 12px;
+    }
+    .subway-line { font-size: 11px; font-weight: 800; color: #fff; background: #ff9800; padding: 2px 7px; border-radius: 6px; margin-right: 8px; white-space: nowrap; }
+    .subway-dir  { font-size: 11px; color: #888; flex: 1; }
+    .subway-time { font-size: 12px; font-weight: 700; color: #ffcc80; text-align: right; white-space: nowrap; }
+    .subway-time.soon { color: #ff6b35; }
+
+    /* 버스 섹션 */
+    .bus-list { display: flex; flex-direction: column; gap: 5px; max-height: 80px; overflow-y: auto; }
+    .bus-item {
+      display: flex; align-items: center;
+      background: rgba(255,255,255,0.04); border-radius: 10px; padding: 7px 12px;
     }
     .bus-no { font-size: 12px; font-weight: 800; color: #fff; background: #1e3a5f; padding: 2px 7px; border-radius: 6px; margin-right: 8px; white-space: nowrap; }
-    .bus-no.village { background: #1a4a2e; }
-    .bus-stop   { font-size: 11px; color: #555; flex: 1; }
-    .bus-arrive { font-size: 12px; font-weight: 700; color: #fff; text-align: right; white-space: nowrap; }
-    .bus-arrive.soon    { color: #ff6b35; }
-    .bus-arrive.loading { color: #444; font-size: 11px; }
+    .bus-stop  { font-size: 11px; color: #555; flex: 1; }
+    .bus-arrive { font-size: 12px; font-weight: 700; color: #82b1ff; text-align: right; white-space: nowrap; }
+
     .toast {
       position: fixed; top: 64px; left: 50%; transform: translateX(-50%);
       border-radius: 20px; padding: 8px 18px; font-size: 12px;
@@ -126,12 +149,21 @@
   <button class="btn-location" id="btn-loc">📍</button>
 
   <div class="panel">
+    <!-- 신호등 -->
     <div class="signal-list" id="signal-list">
       <div style="color:#555;font-size:12px;padding:4px">신호 정보 로딩 중...</div>
     </div>
-    <div class="bus-title" id="bus-title">🚌 버스 도착 정보 — 정류장을 선택하세요</div>
+
+    <!-- 지하철 -->
+    <div class="section-title">🚇 근처 지하철 도착 정보</div>
+    <div class="subway-list" id="subway-list">
+      <div style="color:#555;font-size:12px;padding:4px">지도를 움직이면 근처 역 정보가 표시됩니다</div>
+    </div>
+
+    <!-- 버스 -->
+    <div class="section-title">🚌 버스 도착 정보</div>
     <div class="bus-list" id="bus-list">
-      <div style="color:#555;font-size:12px;padding:8px">지도에서 🚏 정류장 마커를 클릭하세요</div>
+      <div style="color:#555;font-size:12px;padding:4px">지도에서 🚏 정류장 마커를 클릭하세요</div>
     </div>
   </div>
 
@@ -151,8 +183,8 @@
     });
 
     var signalList  = document.getElementById("signal-list");
+    var subwayList  = document.getElementById("subway-list");
     var busList     = document.getElementById("bus-list");
-    var busTitle    = document.getElementById("bus-title");
     var wIcon       = document.getElementById("w-icon");
     var wTemp       = document.getElementById("w-temp");
     var wDesc       = document.getElementById("w-desc");
@@ -160,12 +192,11 @@
     var btnLoc      = document.getElementById("btn-loc");
 
     var sigOverlays     = [];
+    var subwayOverlays  = [];
+    var busOverlays     = [];
     var locOverlay      = null;
-    var stationOverlays = [];
     var myLat = CENTER.lat, myLng = CENTER.lng;
     var searchTimer = null;
-
-    // 신호 상태 저장 (1초 카운트다운용)
     var signalState = [];
 
     function toast(msg, type) {
@@ -196,57 +227,45 @@
         wTemp.textContent = Math.round(d.main.temp) + "°C";
         wDesc.textContent = d.weather[0].description;
         wIcon.textContent = weatherEmoji(d.weather[0].id);
-      } catch(e) {
-        wDesc.textContent = "날씨 정보 없음";
-      }
+      } catch(e) { wDesc.textContent = "날씨 정보 없음"; }
       setTimeout(function() { updateWeather(myLat, myLng); }, 600000);
     }
 
+    // 신호등
     function clearSignalOverlays() {
       sigOverlays.forEach(function(o) { o.setMap(null); });
       sigOverlays = [];
     }
 
-    // 패널 업데이트 (1초마다 호출)
     function updatePanel() {
       if (!signalState.length) return;
       var html = "";
       signalState.forEach(function(s) {
-        var c    = s.isGreen ? "green" : "red";
-        var now  = new Date().toLocaleTimeString("ko-KR", { hour12: false });
+        var c   = s.isGreen ? "green" : "red";
+        var now = new Date().toLocaleTimeString("ko-KR", { hour12: false });
         html += '<div class="signal-item">'
-          + '<div class="si-left">'
-          + '<div class="si-dot ' + c + '"></div>'
+          + '<div class="si-left"><div class="si-dot ' + c + '"></div>'
           + '<span class="si-name">' + s.name + '</span>'
           + (s.isSimulated ? '<span class="si-sim">(예측)</span>' : '')
-          + '</div>'
-          + '<div class="si-right">'
+          + '</div><div class="si-right">'
           + '<div class="si-status ' + c + '">' + (s.isGreen ? "🟢 녹색 " : "🔴 적색 ") + s.sec + "초</div>"
-          + '<div class="si-time">' + now + '</div>'
-          + '</div>'
-          + '</div>';
+          + '<div class="si-time">' + now + '</div></div></div>';
       });
       signalList.innerHTML = html;
-
-      // 지도 마커 초 업데이트
       var secEls = document.querySelectorAll(".s-sec");
       secEls.forEach(function(el, i) {
         if (signalState[i]) el.textContent = signalState[i].sec;
       });
     }
 
-    // 1초마다 카운트다운
     setInterval(function() {
-      signalState.forEach(function(s) {
-        if (s.sec > 1) s.sec--;
-      });
+      signalState.forEach(function(s) { if (s.sec > 1) s.sec--; });
       updatePanel();
     }, 1000);
 
     function setSignalMarkers(rows) {
       clearSignalOverlays();
       signalState = [];
-
       rows.forEach(function(row, i) {
         var sec         = Number(row.RESID_TIME);
         var isGreen     = row.LGHT_COL_CD == "1";
@@ -255,27 +274,22 @@
         var e           = isGreen ? "🟢" : "🔴";
         var name        = row.ITRSC_NM || ("오현로20길 교차로 " + (i === 0 ? "A" : "B"));
         var simTag      = isSimulated ? '<div class="s-sim">* 예측값</div>' : '';
-
         var lat = (row.LAT && row.LAT !== "") ? Number(row.LAT) : CROSSINGS[i] ? CROSSINGS[i].lat : CENTER.lat;
         var lng = (row.LNG && row.LNG !== "") ? Number(row.LNG) : CROSSINGS[i] ? CROSSINGS[i].lng : CENTER.lng;
 
-        // 신호 상태 저장
         signalState.push({ name: name, sec: sec, isGreen: isGreen, isSimulated: isSimulated });
 
-        // 지도 마커
         var overlay = new kakao.maps.CustomOverlay({
           position: new kakao.maps.LatLng(lat, lng),
           content: '<div class="signal-bubble ' + c + '">'
             + '<span class="s-emoji">' + e + '</span>'
             + '<div class="s-sec">' + sec + '</div>'
-            + '<div class="s-label">초 남음</div>'
-            + simTag + '</div>',
+            + '<div class="s-label">초 남음</div>' + simTag + '</div>',
           yAnchor: 1.3
         });
         overlay.setMap(map);
         sigOverlays.push(overlay);
       });
-
       updatePanel();
     }
 
@@ -292,23 +306,88 @@
       setTimeout(updateSignal, 2000);
     }
 
-    var ps = new kakao.maps.services.Places();
+    // 지하철
+    function clearSubwayOverlays() {
+      subwayOverlays.forEach(function(o) { o.setMap(null); });
+      subwayOverlays = [];
+    }
 
-    function clearStationOverlays() {
-      stationOverlays.forEach(function(o) { o.setMap(null); });
-      stationOverlays = [];
+    async function loadSubwayArrival(stationName) {
+      try {
+        var r = await fetch(BASE + "/api/subway?station=" + encodeURIComponent(stationName));
+        var d = await r.json();
+        var list = d.realtimeArrivalList || [];
+        if (!list.length) {
+          subwayList.innerHTML = '<div style="color:#555;font-size:12px;padding:4px">도착 정보 없음</div>';
+          return;
+        }
+        var html = "";
+        list.slice(0, 6).forEach(function(item) {
+          var isSoon = parseInt(item.barvlDt) < 120;
+          html += '<div class="subway-item">'
+            + '<span class="subway-line">4호선</span>'
+            + '<span class="subway-dir">' + item.updnLine + ' · ' + item.trainLineNm.split(" - ")[0] + '</span>'
+            + '<span class="subway-time ' + (isSoon ? "soon" : "") + '">' + item.arvlMsg2 + '</span>'
+            + '</div>';
+        });
+        subwayList.innerHTML = html;
+      } catch(e) {
+        subwayList.innerHTML = '<div style="color:#555;font-size:12px;padding:4px">지하철 정보 수신 실패</div>';
+      }
+    }
+
+    async function loadNearbySubway() {
+      var center = map.getCenter();
+      var lat    = center.getLat();
+      var lng    = center.getLng();
+      try {
+        var r = await fetch(BASE + "/api/nearbySubway?lat=" + lat + "&lng=" + lng);
+        var d = await r.json();
+        var places = d.documents || [];
+        clearSubwayOverlays();
+
+        if (!places.length) {
+          subwayList.innerHTML = '<div style="color:#555;font-size:12px;padding:4px">근처 지하철역 없음</div>';
+          return;
+        }
+
+        // 가장 가까운 역 자동으로 도착정보 표시
+        var nearest = places[0];
+        var stationName = nearest.place_name.replace("역", "").trim();
+        loadSubwayArrival(stationName);
+
+        places.forEach(function(place) {
+          var name = place.place_name.replace("역", "").trim();
+          var overlay = new kakao.maps.CustomOverlay({
+            position: new kakao.maps.LatLng(place.y, place.x),
+            content: '<div class="subway-marker" onclick="loadSubwayArrival(\'' + name + '\')">🚇 ' + place.place_name + '</div>',
+            yAnchor: 1.3
+          });
+          overlay.setMap(map);
+          subwayOverlays.push(overlay);
+        });
+      } catch(e) {
+        subwayList.innerHTML = '<div style="color:#555;font-size:12px;padding:4px">지하철 정보 수신 실패</div>';
+      }
+    }
+
+    // 버스
+    function clearBusOverlays() {
+      busOverlays.forEach(function(o) { o.setMap(null); });
+      busOverlays = [];
     }
 
     function showStation(name) {
-      busTitle.textContent = "🚌 " + name;
-      busList.innerHTML = '<div style="color:#555;font-size:12px;padding:8px">버스 API 연동 준비 중...</div>';
+      busList.innerHTML = '<div style="color:#555;font-size:12px;padding:4px">버스 API 연동 준비 중...</div>';
     }
 
-    function loadNearbyStations() {
+    var ps = new kakao.maps.services.Places();
+
+    function loadNearbyBusStops() {
       var center = map.getCenter();
       ps.keywordSearch("버스정류장", function(data, status) {
         if (status !== kakao.maps.services.Status.OK) return;
-        clearStationOverlays();
+        clearBusOverlays();
         data.forEach(function(place) {
           var overlay = new kakao.maps.CustomOverlay({
             position: new kakao.maps.LatLng(place.y, place.x),
@@ -316,18 +395,24 @@
             yAnchor: 1.3
           });
           overlay.setMap(map);
-          stationOverlays.push(overlay);
+          busOverlays.push(overlay);
         });
       }, { location: center, radius: 500 });
     }
 
     kakao.maps.event.addListener(map, "dragend", function() {
       clearTimeout(searchTimer);
-      searchTimer = setTimeout(loadNearbyStations, 500);
+      searchTimer = setTimeout(function() {
+        loadNearbySubway();
+        loadNearbyBusStops();
+      }, 500);
     });
     kakao.maps.event.addListener(map, "zoom_changed", function() {
       clearTimeout(searchTimer);
-      searchTimer = setTimeout(loadNearbyStations, 500);
+      searchTimer = setTimeout(function() {
+        loadNearbySubway();
+        loadNearbyBusStops();
+      }, 500);
     });
 
     function setMyLocation(lat, lng) {
@@ -352,7 +437,8 @@
           map.setCenter(new kakao.maps.LatLng(lat, lng));
           map.setLevel(3);
           updateWeather(lat, lng);
-          loadNearbyStations();
+          loadNearbySubway();
+          loadNearbyBusStops();
           toast("📍 현재 위치로 이동", "info");
         },
         function() { toast("위치 권한을 허용해주세요"); }
@@ -361,7 +447,8 @@
 
     updateSignal();
     updateWeather(CENTER.lat, CENTER.lng);
-    loadNearbyStations();
+    loadNearbySubway();
+    loadNearbyBusStops();
   </script>
 </body>
 </html>
