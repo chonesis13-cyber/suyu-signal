@@ -9,6 +9,7 @@ const app  = express();
 const PORT = process.env.PORT || 3000;
 
 const SEOUL_KEY   = "58456c6f4d61737435384d664d5943";
+const SUBWAY_KEY  = "507057584e6173743130355570556445";
 const KAKAO_REST  = "b9430d7f52d1000a6038b7eb6402cccc";
 const WEATHER_KEY = "af228254ffa0eb85c2d1ffced047cb05";
 
@@ -18,36 +19,33 @@ const CROSSINGS = [
   { name: "오현로20길 교차로 B", lat: "37.625226", lng: "127.037151" }
 ];
 
-// 신호 시뮬레이션 (A와 B는 반대 신호)
+// 신호 시뮬레이션
 function getSignalData() {
   const CYCLE      = 90;
   const GREEN_SEC  = 30;
-  const RED_SEC    = CYCLE - GREEN_SEC; // 60초
+  const RED_SEC    = CYCLE - GREEN_SEC;
   const now        = Math.floor(Date.now() / 1000);
   const elapsed    = now % CYCLE;
 
-  // A: 0~30초 녹색, 30~90초 적색
   const aIsGreen   = elapsed < GREEN_SEC;
   const aResid     = aIsGreen ? GREEN_SEC - elapsed : CYCLE - elapsed;
 
-  // B: 0~60초 적색, 60~90초 녹색 (A와 반대)
   const bElapsed   = (elapsed + RED_SEC) % CYCLE;
   const bIsGreen   = bElapsed < GREEN_SEC;
-  const bResid     = bIsGreen ? GREEN_SEC - bElapsed : CYCLE - bElapsed;
+  const bResid     = Math.max(1, bIsGreen ? GREEN_SEC - bElapsed : CYCLE - bElapsed);
+
   return [
     {
       ITRSC_NM: CROSSINGS[0].name,
       LGHT_COL_CD: aIsGreen ? "1" : "2",
       RESID_TIME: aResid,
-      LAT: "", LNG: "",
-      SIMULATED: true
+      LAT: "", LNG: "", SIMULATED: true
     },
     {
       ITRSC_NM: CROSSINGS[1].name,
       LGHT_COL_CD: bIsGreen ? "1" : "2",
       RESID_TIME: bResid,
-      LAT: "", LNG: "",
-      SIMULATED: true
+      LAT: "", LNG: "", SIMULATED: true
     }
   ];
 }
@@ -57,8 +55,6 @@ app.use(cors({ origin: "*" }));
 // 신호등 API
 app.get("/api/signal", async (req, res) => {
   if (!fetch) return res.status(503).json({ error: "서버 초기화 중" });
-
-  // 실시간 API 먼저 시도
   try {
     const r = await fetch(
       `http://openAPI.seoul.go.kr:8088/${SEOUL_KEY}/json/SptTrafficLghtResidTime/1/5/`,
@@ -68,7 +64,6 @@ app.get("/api/signal", async (req, res) => {
     if (!d.RESULT) return res.json(d);
   } catch (e) {}
 
-  // 실패시 시뮬레이션
   res.json({
     SptTrafficLghtResidTime: {
       list_total_count: 2,
@@ -76,6 +71,36 @@ app.get("/api/signal", async (req, res) => {
       row: getSignalData()
     }
   });
+});
+
+// 지하철 실시간 도착정보
+app.get("/api/subway", async (req, res) => {
+  if (!fetch) return res.status(503).json({ error: "서버 초기화 중" });
+  const { station } = req.query;
+  if (!station) return res.status(400).json({ error: "역 이름 필요" });
+  try {
+    const url = `http://swopenAPI.seoul.go.kr/api/subway/${SUBWAY_KEY}/json/realtimeStationArrival/0/10/${encodeURIComponent(station)}`;
+    const r = await fetch(url);
+    const d = await r.json();
+    res.json(d);
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
+});
+
+// 카카오 근처 지하철역 검색
+app.get("/api/nearbySubway", async (req, res) => {
+  if (!fetch) return res.status(503).json({ error: "서버 초기화 중" });
+  const { lat, lng } = req.query;
+  if (!lat || !lng) return res.status(400).json({ error: "위치 정보 필요" });
+  try {
+    const url = `https://dapi.kakao.com/v2/local/search/category.json?category_group_code=SW8&x=${lng}&y=${lat}&radius=1000&size=5&sort=distance`;
+    const r = await fetch(url, { headers: { Authorization: `KakaoAK ${KAKAO_REST}` } });
+    const d = await r.json();
+    res.json(d);
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
 });
 
 // 카카오 근처 버스정류장 검색
@@ -88,7 +113,9 @@ app.get("/api/stations", async (req, res) => {
     const r = await fetch(url, { headers: { Authorization: `KakaoAK ${KAKAO_REST}` } });
     const d = await r.json();
     res.json(d);
-  } catch (e) { res.status(502).json({ error: e.message }); }
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
 });
 
 // 날씨 API
@@ -101,7 +128,9 @@ app.get("/api/weather", async (req, res) => {
     const r = await fetch(url);
     const d = await r.json();
     res.json(d);
-  } catch (e) { res.status(502).json({ error: e.message }); }
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
 });
 
 // 정적 파일
