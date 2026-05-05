@@ -353,7 +353,7 @@
 
         // 가장 가까운 역 자동으로 도착정보 표시
         var nearest = places[0];
-        var stationName = nearest.place_name.replace("역", "").trim();
+        var name = place.place_name.replace(/역$/, "").trim();
         loadSubwayArrival(stationName);
 
         places.forEach(function(place) {
