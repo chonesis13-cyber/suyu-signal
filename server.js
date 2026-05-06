@@ -8,7 +8,6 @@ let fetch;
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-const SEOUL_KEY   = "58456c6f4d61737435384d664d5943";
 const TDATA_KEY   = "ed415d5d-ad1c-47dd-b699-f31ddf4dd45a";
 const SUBWAY_KEY  = "507057584e6173743130355570556445";
 const KAKAO_REST  = "b9430d7f52d1000a6038b7eb6402cccc";
@@ -19,18 +18,18 @@ const CROSSINGS = [
   { name: "오현로20길 교차로 B", lat: "37.625226", lng: "127.037151" }
 ];
 
-function getSignalData() {
-  const CYCLE      = 90;
-  const GREEN_SEC  = 30;
-  const RED_SEC    = CYCLE - GREEN_SEC;
-  const now        = Math.floor(Date.now() / 1000);
-  const elapsed    = now % CYCLE;
+function getSimulatedSignal() {
+  const CYCLE     = 90;
+  const GREEN_SEC = 30;
+  const RED_SEC   = CYCLE - GREEN_SEC;
+  const now       = Math.floor(Date.now() / 1000);
+  const elapsed   = now % CYCLE;
 
-  const aIsGreen   = elapsed < GREEN_SEC;
-  const aResid     = aIsGreen ? GREEN_SEC - elapsed : CYCLE - elapsed;
-  const bElapsed   = (elapsed + RED_SEC) % CYCLE;
-  const bIsGreen   = bElapsed < GREEN_SEC;
-  const bResid     = Math.max(1, bIsGreen ? GREEN_SEC - bElapsed : CYCLE - bElapsed);
+  const aIsGreen  = elapsed < GREEN_SEC;
+  const aResid    = aIsGreen ? GREEN_SEC - elapsed : CYCLE - elapsed;
+  const bElapsed  = (elapsed + RED_SEC) % CYCLE;
+  const bIsGreen  = bElapsed < GREEN_SEC;
+  const bResid    = Math.max(1, bIsGreen ? GREEN_SEC - bElapsed : CYCLE - bElapsed);
 
   return [
     { ITRSC_NM: CROSSINGS[0].name, LGHT_COL_CD: aIsGreen ? "1" : "2", RESID_TIME: aResid, LAT: "", LNG: "", SIMULATED: true },
@@ -38,58 +37,89 @@ function getSignalData() {
   ];
 }
 
+// T-Data 데이터 파싱
+function parseTDataSignal(items) {
+  var rows = [];
+  items.slice(0, 5).forEach(function(item) {
+    // 방향별 보행신호 잔여시간 중 null이 아닌 값 찾기
+    var bssgFields = ["ntBssgRmdrCs", "stBssgRmdrCs", "etBssgRmdrCs", "wtBssgRmdrCs", "seBssgRmdrCs", "swBssgRmdrCs", "neBssgRmdrCs", "nwBssgRmdrCs"];
+    var stsgFields = ["ntStsgRmdrCs", "stStsgRmdrCs", "etStsgRmdrCs", "wtStsgRmdrCs", "seStsgRmdrCs", "swStsgRmdrCs", "neStsgRmdrCs", "nwStsgRmdrCs"];
+
+    var greenTime = null;
+    var redTime   = null;
+
+    for (var i = 0; i < bssgFields.length; i++) {
+      if (item[bssgFields[i]] !== null && item[bssgFields[i]] > 0) {
+        greenTime = item[bssgFields[i]];
+        break;
+      }
+    }
+    for (var j = 0; j < stsgFields.length; j++) {
+      if (item[stsgFields[j]] !== null && item[stsgFields[j]] > 0) {
+        redTime = item[stsgFields[j]];
+        break;
+      }
+    }
+
+    var isGreen   = greenTime !== null && greenTime > 0;
+    var residTime = isGreen ? Math.round(greenTime / 10) : (redTime ? Math.round(redTime / 10) : 30);
+
+    rows.push({
+      ITRSC_NM:    item.eqmnId || item.dataId || "교차로",
+      LGHT_COL_CD: isGreen ? "1" : "2",
+      RESID_TIME:  residTime,
+      LAT:         "",
+      LNG:         "",
+      SIMULATED:   false
+    });
+  });
+  return rows;
+}
+
 app.use(cors({ origin: "*" }));
 
-// T-Data 신호등 실시간 API
+// 신호등 API
 app.get("/api/signal", async (req, res) => {
   if (!fetch) return res.status(503).json({ error: "서버 초기화 중" });
 
-  // T-Data 실시간 먼저 시도
   try {
     const url = `http://t-data.seoul.go.kr/apig/apiman-gateway/tapi/v2xSignalPhaseTimingInformation/1.0?apiKey=${TDATA_KEY}`;
-    const r = await fetch(url, { timeout: 5000 });
-    const d = await r.json();
-    if (d && d.length > 0) {
-      // T-Data 데이터를 기존 형식으로 변환
-      const rows = d.slice(0, 5).map(function(item) {
-        const isGreen = item.ntBssgRmdrCs > 0;
-        const residTime = isGreen ? item.ntBssgRmdrCs : item.stBssgRmdrCs;
-        return {
-          ITRSC_NM: item.itstId || "교차로",
-          LGHT_COL_CD: isGreen ? "1" : "2",
-          RESID_TIME: residTime || 30,
-          LAT: "",
-          LNG: "",
-          SIMULATED: false
-        };
-      });
-      return res.json({
-        SptTrafficLghtResidTime: {
-          list_total_count: rows.length,
-          RESULT: { CODE: "INFO-000", MESSAGE: "정상 처리되었습니다" },
-          row: rows
-        }
-      });
+    const r   = await fetch(url, { timeout: 5000 });
+    const d   = await r.json();
+
+    if (Array.isArray(d) && d.length > 0) {
+      const rows = parseTDataSignal(d);
+      if (rows.length > 0) {
+        return res.json({
+          SptTrafficLghtResidTime: {
+            list_total_count: rows.length,
+            RESULT: { CODE: "INFO-000", MESSAGE: "정상 처리되었습니다" },
+            row: rows
+          }
+        });
+      }
     }
-  } catch (e) {}
+  } catch (e) {
+    console.log("T-Data 오류:", e.message);
+  }
 
   // 실패시 시뮬레이션
   res.json({
     SptTrafficLghtResidTime: {
       list_total_count: 2,
       RESULT: { CODE: "INFO-000", MESSAGE: "정상 처리되었습니다" },
-      row: getSignalData()
+      row: getSimulatedSignal()
     }
   });
 });
 
-// T-Data 신호등 원본 데이터
+// T-Data 원본
 app.get("/api/signal/raw", async (req, res) => {
   if (!fetch) return res.status(503).json({ error: "서버 초기화 중" });
   try {
     const url = `http://t-data.seoul.go.kr/apig/apiman-gateway/tapi/v2xSignalPhaseTimingInformation/1.0?apiKey=${TDATA_KEY}`;
-    const r = await fetch(url, { timeout: 5000 });
-    const d = await r.json();
+    const r   = await fetch(url, { timeout: 5000 });
+    const d   = await r.json();
     res.json(d);
   } catch (e) {
     res.status(502).json({ error: e.message });
@@ -103,38 +133,38 @@ app.get("/api/subway", async (req, res) => {
   if (!station) return res.status(400).json({ error: "역 이름 필요" });
   try {
     const url = `http://swopenAPI.seoul.go.kr/api/subway/${SUBWAY_KEY}/json/realtimeStationArrival/0/10/${encodeURIComponent(station)}`;
-    const r = await fetch(url);
-    const d = await r.json();
+    const r   = await fetch(url);
+    const d   = await r.json();
     res.json(d);
   } catch (e) {
     res.status(502).json({ error: e.message });
   }
 });
 
-// 카카오 근처 지하철역 검색
+// 카카오 근처 지하철역
 app.get("/api/nearbySubway", async (req, res) => {
   if (!fetch) return res.status(503).json({ error: "서버 초기화 중" });
   const { lat, lng } = req.query;
   if (!lat || !lng) return res.status(400).json({ error: "위치 정보 필요" });
   try {
     const url = `https://dapi.kakao.com/v2/local/search/category.json?category_group_code=SW8&x=${lng}&y=${lat}&radius=1000&size=5&sort=distance`;
-    const r = await fetch(url, { headers: { Authorization: `KakaoAK ${KAKAO_REST}` } });
-    const d = await r.json();
+    const r   = await fetch(url, { headers: { Authorization: `KakaoAK ${KAKAO_REST}` } });
+    const d   = await r.json();
     res.json(d);
   } catch (e) {
     res.status(502).json({ error: e.message });
   }
 });
 
-// 카카오 근처 버스정류장 검색
+// 카카오 근처 버스정류장
 app.get("/api/stations", async (req, res) => {
   if (!fetch) return res.status(503).json({ error: "서버 초기화 중" });
   const { lat, lng } = req.query;
   if (!lat || !lng) return res.status(400).json({ error: "위치 정보 필요" });
   try {
     const url = `https://dapi.kakao.com/v2/local/search/keyword.json?query=버스정류장&x=${lng}&y=${lat}&radius=500&size=15`;
-    const r = await fetch(url, { headers: { Authorization: `KakaoAK ${KAKAO_REST}` } });
-    const d = await r.json();
+    const r   = await fetch(url, { headers: { Authorization: `KakaoAK ${KAKAO_REST}` } });
+    const d   = await r.json();
     res.json(d);
   } catch (e) {
     res.status(502).json({ error: e.message });
@@ -148,15 +178,14 @@ app.get("/api/weather", async (req, res) => {
   if (!lat || !lng) return res.status(400).json({ error: "위치 정보 필요" });
   try {
     const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&appid=${WEATHER_KEY}&units=metric&lang=kr`;
-    const r = await fetch(url);
-    const d = await r.json();
+    const r   = await fetch(url);
+    const d   = await r.json();
     res.json(d);
   } catch (e) {
     res.status(502).json({ error: e.message });
   }
 });
 
-// 정적 파일
 app.use(express.static(path.join(__dirname, "public")));
 
 app.listen(PORT, () => console.log(`✅ 서버 실행 중: http://localhost:${PORT}`));
