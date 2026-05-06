@@ -20,7 +20,8 @@
     .weather-info { margin-left: auto; display: flex; align-items: center; gap: 6px; }
     .weather-info .temp { font-size: 15px; font-weight: 700; color: #fff; }
     .weather-info .desc { font-size: 11px; color: #888; }
-    .#map { width: 100vw; height: 100vh; }
+    .w-icon { font-size: 22px; }
+    #map { width: 100vw; height: 100vh; }
     .btn-location {
       position: fixed; right: 16px; z-index: 15;
       width: 46px; height: 46px; border-radius: 50%;
@@ -69,8 +70,6 @@
       0%   { box-shadow: 0 0 0 0 rgba(41,121,255,0.4); }
       100% { box-shadow: 0 0 0 14px rgba(41,121,255,0); }
     }
-
-    /* 하단 패널 */
     .panel {
       position: fixed; bottom: 0; left: 0; right: 0; z-index: 15;
       background: rgba(13,13,13,0.97); backdrop-filter: blur(12px);
@@ -78,13 +77,10 @@
       transition: transform 0.4s ease;
     }
     .panel.collapsed { transform: translateY(calc(100% - 52px)); }
-
-    /* 탭바 */
     .tab-bar {
       display: flex; align-items: center;
       padding: 0 12px; height: 52px;
-      gap: 6px; cursor: pointer;
-      border-bottom: 1px solid rgba(255,255,255,0.07);
+      gap: 6px; border-bottom: 1px solid rgba(255,255,255,0.07);
     }
     .tab {
       padding: 6px 12px; border-radius: 20px;
@@ -103,13 +99,9 @@
       padding: 8px; cursor: pointer;
     }
     .panel.collapsed .toggle-btn { transform: rotate(180deg); }
-
-    /* 패널 컨텐츠 */
     .panel-content { padding: 12px 16px 24px; max-height: 260px; overflow-y: auto; }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
-
-    /* 신호등 탭 */
     .signal-list { display: flex; flex-direction: column; gap: 6px; }
     .signal-item {
       display: flex; align-items: center; justify-content: space-between;
@@ -127,8 +119,6 @@
     .si-status.green { color: #00e676; }
     .si-status.red   { color: #ff1744; }
     .si-time  { font-size: 10px; color: #444; margin-top: 2px; }
-
-    /* 지하철 탭 */
     .section-name { font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 8px; }
     .subway-list { display: flex; flex-direction: column; gap: 5px; }
     .subway-item {
@@ -139,8 +129,6 @@
     .subway-dir  { font-size: 11px; color: #888; flex: 1; }
     .subway-time { font-size: 12px; font-weight: 700; color: #ffcc80; text-align: right; white-space: nowrap; }
     .subway-time.soon { color: #ff6b35; }
-
-    /* 버스 탭 */
     .bus-list { display: flex; flex-direction: column; gap: 5px; }
     .bus-item {
       display: flex; align-items: center;
@@ -149,7 +137,6 @@
     .bus-no { font-size: 12px; font-weight: 800; color: #fff; background: #1e3a5f; padding: 2px 7px; border-radius: 6px; margin-right: 8px; white-space: nowrap; }
     .bus-stop  { font-size: 11px; color: #555; flex: 1; }
     .bus-arrive { font-size: 12px; font-weight: 700; color: #82b1ff; text-align: right; white-space: nowrap; }
-
     .toast {
       position: fixed; top: 64px; left: 50%; transform: translateX(-50%);
       border-radius: 20px; padding: 8px 18px; font-size: 12px;
@@ -205,12 +192,8 @@
   <div class="toast" id="toast"></div>
 
   <script>
-    var BASE      = "https://suyu-signal.onrender.com";
-    var CENTER    = { lat: 37.625395, lng: 127.037088 };
-    var CROSSINGS = [
-      { lat: 37.625428, lng: 127.037069 },
-      { lat: 37.625226, lng: 127.037151 }
-    ];
+    var BASE   = "https://suyu-signal.onrender.com";
+    var CENTER = { lat: 37.625395, lng: 127.037088 };
 
     var map = new kakao.maps.Map(document.getElementById("map"), {
       center: new kakao.maps.LatLng(CENTER.lat, CENTER.lng),
@@ -338,10 +321,10 @@
         var isSimulated = row.SIMULATED === true;
         var c           = isGreen ? "green" : "red";
         var e           = isGreen ? "🟢" : "🔴";
-        var name        = row.ITRSC_NM || ("교차로 " + (i + 1));
+        var name        = row.ITRSC_NM || ("횡단보도 " + (i + 1));
         var simTag      = isSimulated ? '<div class="s-sim">* 예측값</div>' : '';
-        var lat = (row.LAT && row.LAT !== "") ? Number(row.LAT) : CROSSINGS[i] ? CROSSINGS[i].lat : CENTER.lat;
-        var lng = (row.LNG && row.LNG !== "") ? Number(row.LNG) : CROSSINGS[i] ? CROSSINGS[i].lng : CENTER.lng;
+        var lat         = Number(row.LAT);
+        var lng         = Number(row.LNG);
 
         signalState.push({ name: name, sec: sec, isGreen: isGreen, isSimulated: isSimulated });
 
@@ -361,7 +344,10 @@
 
     async function updateSignal() {
       try {
-        var r = await fetch(BASE + "/api/signal");
+        var center = map.getCenter();
+        var lat    = center.getLat();
+        var lng    = center.getLng();
+        var r = await fetch(BASE + "/api/signal?lat=" + lat + "&lng=" + lng);
         if (!r.ok) throw new Error();
         var d = await r.json();
         if (!d || !d.SptTrafficLghtResidTime || !d.SptTrafficLghtResidTime.row || !d.SptTrafficLghtResidTime.row.length) throw new Error();
@@ -473,6 +459,7 @@
     kakao.maps.event.addListener(map, "dragend", function() {
       clearTimeout(searchTimer);
       searchTimer = setTimeout(function() {
+        updateSignal();
         loadNearbySubway();
         loadNearbyBusStops();
       }, 500);
@@ -480,6 +467,7 @@
     kakao.maps.event.addListener(map, "zoom_changed", function() {
       clearTimeout(searchTimer);
       searchTimer = setTimeout(function() {
+        updateSignal();
         loadNearbySubway();
         loadNearbyBusStops();
       }, 500);
@@ -508,6 +496,7 @@
           map.setCenter(new kakao.maps.LatLng(lat, lng));
           map.setLevel(3);
           updateWeather(lat, lng);
+          updateSignal();
           loadNearbySubway();
           loadNearbyBusStops();
           toast("📍 현재 위치로 이동", "info");
