@@ -97,13 +97,20 @@ app.get("/api/signal", async (req, res) => {
   var lat = parseFloat(req.query.lat) || 37.648900;
   var lng = parseFloat(req.query.lng) || 127.027700;
 
+  // 반경 300m 안 신호등 최대 4개만
   var nearby = SIGNAL_LOCATIONS.filter(function(s) {
-    return distance(lat, lng, s.lat, s.lng) < 500;
-  });
+    return distance(lat, lng, s.lat, s.lng) < 300;
+  }).slice(0, 4);
 
   if (!nearby.length) {
-    nearby = SIGNAL_LOCATIONS.slice(0, 5);
+    nearby = SIGNAL_LOCATIONS.filter(function(s) {
+      return distance(lat, lng, s.lat, s.lng) < 500;
+    }).slice(0, 4);
   }
+
+  if (!nearby.length) return res.json({
+    SptTrafficLghtResidTime: { list_total_count: 0, RESULT: { CODE: "INFO-000" }, row: [] }
+  });
 
   try {
     var url = "http://t-data.seoul.go.kr/apig/apiman-gateway/tapi/v2xSignalPhaseTimingInformation/1.0?apiKey=" + TDATA_KEY;
@@ -112,7 +119,7 @@ app.get("/api/signal", async (req, res) => {
 
     if (Array.isArray(d) && d.length > 0) {
       var signals = parseTData(d);
-      var rows = nearby.slice(0, 10).map(function(loc, i) {
+      var rows = nearby.map(function(loc, i) {
         var sig = signals[i % signals.length];
         return {
           ITRSC_NM:    dirToName(loc.dir) + "측 횡단보도",
@@ -133,9 +140,9 @@ app.get("/api/signal", async (req, res) => {
 
   var CYCLE = 90, GREEN = 30;
   var now = Math.floor(Date.now() / 1000);
-  var rows = nearby.slice(0, 10).map(function(loc, i) {
-    var elapsed  = (now + i * 18) % CYCLE;
-    var isGreen  = elapsed < GREEN;
+  var rows = nearby.map(function(loc, i) {
+    var elapsed   = (now + i * 18) % CYCLE;
+    var isGreen   = elapsed < GREEN;
     var residTime = isGreen ? GREEN - elapsed : CYCLE - elapsed;
     return {
       ITRSC_NM:    dirToName(loc.dir) + "측 횡단보도",
