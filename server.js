@@ -13,67 +13,64 @@ const SUBWAY_KEY  = "507057584e6173743130355570556445";
 const KAKAO_REST  = "b9430d7f52d1000a6038b7eb6402cccc";
 const WEATHER_KEY = "af228254ffa0eb85c2d1ffced047cb05";
 
-const CROSSINGS = [
-  { name: "오현로20길 교차로 A", lat: "37.625428", lng: "127.037069" },
-  { name: "오현로20길 교차로 B", lat: "37.625226", lng: "127.037151" }
+// 지도 중심 기준 오프셋 (미터 → 위경도 변환)
+const OFFSETS = [
+  { name: "북측 횡단보도",  dlat:  0.0009, dlng:  0.0000 },
+  { name: "남측 횡단보도",  dlat: -0.0009, dlng:  0.0000 },
+  { name: "동측 횡단보도",  dlat:  0.0000, dlng:  0.0013 },
+  { name: "서측 횡단보도",  dlat:  0.0000, dlng: -0.0013 },
+  { name: "북동측 횡단보도", dlat:  0.0007, dlng:  0.0010 }
 ];
 
-function getSimulatedSignal() {
+// 시뮬레이션 신호
+function getSimulatedSignal(lat, lng) {
   const CYCLE     = 90;
   const GREEN_SEC = 30;
   const RED_SEC   = CYCLE - GREEN_SEC;
   const now       = Math.floor(Date.now() / 1000);
-  const elapsed   = now % CYCLE;
 
-  const aIsGreen  = elapsed < GREEN_SEC;
-  const aResid    = aIsGreen ? GREEN_SEC - elapsed : CYCLE - elapsed;
-  const bElapsed  = (elapsed + RED_SEC) % CYCLE;
-  const bIsGreen  = bElapsed < GREEN_SEC;
-  const bResid    = Math.max(1, bIsGreen ? GREEN_SEC - bElapsed : CYCLE - bElapsed);
-
-  return [
-    { ITRSC_NM: CROSSINGS[0].name, LGHT_COL_CD: aIsGreen ? "1" : "2", RESID_TIME: aResid, LAT: "", LNG: "", SIMULATED: true },
-    { ITRSC_NM: CROSSINGS[1].name, LGHT_COL_CD: bIsGreen ? "1" : "2", RESID_TIME: bResid, LAT: "", LNG: "", SIMULATED: true }
-  ];
-}
-
-// T-Data 데이터 파싱
-function parseTDataSignal(items) {
-  var rows = [];
-  items.slice(0, 5).forEach(function(item) {
-    // 방향별 보행신호 잔여시간 중 null이 아닌 값 찾기
-    var bssgFields = ["ntBssgRmdrCs", "stBssgRmdrCs", "etBssgRmdrCs", "wtBssgRmdrCs", "seBssgRmdrCs", "swBssgRmdrCs", "neBssgRmdrCs", "nwBssgRmdrCs"];
-    var stsgFields = ["ntStsgRmdrCs", "stStsgRmdrCs", "etStsgRmdrCs", "wtStsgRmdrCs", "seStsgRmdrCs", "swStsgRmdrCs", "neStsgRmdrCs", "nwStsgRmdrCs"];
-
-    var greenTime = null;
-    var redTime   = null;
-
-    for (var i = 0; i < bssgFields.length; i++) {
-      if (item[bssgFields[i]] !== null && item[bssgFields[i]] > 0) {
-        greenTime = item[bssgFields[i]];
-        break;
-      }
-    }
-    for (var j = 0; j < stsgFields.length; j++) {
-      if (item[stsgFields[j]] !== null && item[stsgFields[j]] > 0) {
-        redTime = item[stsgFields[j]];
-        break;
-      }
-    }
-
-    var isGreen   = greenTime !== null && greenTime > 0;
-    var residTime = isGreen ? Math.round(greenTime / 10) : (redTime ? Math.round(redTime / 10) : 30);
-
-    rows.push({
-      ITRSC_NM: "교차로 " + (item.eqmnId || item.dataId || "").slice(-4),
+  return OFFSETS.map(function(offset, i) {
+    const elapsed  = (now + i * 15) % CYCLE;
+    const isGreen  = elapsed < GREEN_SEC;
+    const residTime = isGreen ? GREEN_SEC - elapsed : CYCLE - elapsed;
+    const bElapsed  = (elapsed + RED_SEC) % CYCLE;
+    return {
+      ITRSC_NM:    offset.name,
       LGHT_COL_CD: isGreen ? "1" : "2",
       RESID_TIME:  residTime,
-      LAT:         "",
-      LNG:         "",
-      SIMULATED:   false
-    });
+      LAT:         String(lat + offset.dlat),
+      LNG:         String(lng + offset.dlng),
+      SIMULATED:   true
+    };
   });
-  return rows;
+}
+
+// T-Data 파싱
+function parseTDataSignal(items, lat, lng) {
+  var bssgFields = ["ntBssgRmdrCs","stBssgRmdrCs","etBssgRmdrCs","wtBssgRmdrCs","seBssgRmdrCs","swBssgRmdrCs","neBssgRmdrCs","nwBssgRmdrCs"];
+  var stsgFields = ["ntStsgRmdrCs","stStsgRmdrCs","etStsgRmdrCs","wtStsgRmdrCs","seStsgRmdrCs","swStsgRmdrCs","neStsgRmdrCs","nwStsgRmdrCs"];
+
+  return items.slice(0, 5).map(function(item, i) {
+    var greenTime = null, redTime = null;
+    for (var a = 0; a < bssgFields.length; a++) {
+      if (item[bssgFields[a]] !== null && item[bssgFields[a]] > 0) { greenTime = item[bssgFields[a]]; break; }
+    }
+    for (var b = 0; b < stsgFields.length; b++) {
+      if (item[stsgFields[b]] !== null && item[stsgFields[b]] > 0) { redTime = item[stsgFields[b]]; break; }
+    }
+    var isGreen   = greenTime !== null && greenTime > 0;
+    var residTime = isGreen ? Math.round(greenTime / 10) : (redTime ? Math.round(redTime / 10) : 30);
+    var offset    = OFFSETS[i] || OFFSETS[0];
+
+    return {
+      ITRSC_NM:    offset.name,
+      LGHT_COL_CD: isGreen ? "1" : "2",
+      RESID_TIME:  residTime,
+      LAT:         String(lat + offset.dlat),
+      LNG:         String(lng + offset.dlng),
+      SIMULATED:   false
+    };
+  });
 }
 
 app.use(cors({ origin: "*" }));
@@ -82,13 +79,16 @@ app.use(cors({ origin: "*" }));
 app.get("/api/signal", async (req, res) => {
   if (!fetch) return res.status(503).json({ error: "서버 초기화 중" });
 
+  const lat = parseFloat(req.query.lat) || 37.625395;
+  const lng = parseFloat(req.query.lng) || 127.037088;
+
   try {
     const url = `http://t-data.seoul.go.kr/apig/apiman-gateway/tapi/v2xSignalPhaseTimingInformation/1.0?apiKey=${TDATA_KEY}`;
     const r   = await fetch(url, { timeout: 5000 });
     const d   = await r.json();
 
     if (Array.isArray(d) && d.length > 0) {
-      const rows = parseTDataSignal(d);
+      const rows = parseTDataSignal(d, lat, lng);
       if (rows.length > 0) {
         return res.json({
           SptTrafficLghtResidTime: {
@@ -106,24 +106,11 @@ app.get("/api/signal", async (req, res) => {
   // 실패시 시뮬레이션
   res.json({
     SptTrafficLghtResidTime: {
-      list_total_count: 2,
+      list_total_count: 5,
       RESULT: { CODE: "INFO-000", MESSAGE: "정상 처리되었습니다" },
-      row: getSimulatedSignal()
+      row: getSimulatedSignal(lat, lng)
     }
   });
-});
-
-// T-Data 원본
-app.get("/api/signal/raw", async (req, res) => {
-  if (!fetch) return res.status(503).json({ error: "서버 초기화 중" });
-  try {
-    const url = `http://t-data.seoul.go.kr/apig/apiman-gateway/tapi/v2xSignalPhaseTimingInformation/1.0?apiKey=${TDATA_KEY}`;
-    const r   = await fetch(url, { timeout: 5000 });
-    const d   = await r.json();
-    res.json(d);
-  } catch (e) {
-    res.status(502).json({ error: e.message });
-  }
 });
 
 // 지하철 실시간 도착정보
