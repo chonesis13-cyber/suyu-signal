@@ -70,8 +70,7 @@ function parseTData(items) {
     const isGreen = greenTime !== null && greenTime > 0;
     return {
       isGreen,
-      residTime: isGreen ? Math.round(greenTime/10) : (redTime ? Math.round(redTime/10) : 30)
-    };
+      var residTime = isGreen ? Math.min(Math.round(greenTime / 10), 180) : Math.min((redTime ? Math.round(redTime / 10) : 30), 180);
   });
 }
 
