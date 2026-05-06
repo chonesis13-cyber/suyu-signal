@@ -192,12 +192,14 @@
 
   <script>
     var BASE   = "https://suyu-signal.onrender.com";
-    var CENTER = { lat: 37.648900, lng: 127.027700 }; // 수유역
+    var SUYU   = { lat: 37.648900, lng: 127.027700 }; // 수유역
 
-    var map = new kakao.maps.Map(document.getElementById("map"), {
-      center: new kakao.maps.LatLng(CENTER.lat, CENTER.lng),
-      level: 4
-    });
+    // 카카오맵 초기화 후 강제로 수유역으로 이동
+    var mapContainer = document.getElementById("map");
+    var mapOption = { center: new kakao.maps.LatLng(SUYU.lat, SUYU.lng), level: 4 };
+    var map = new kakao.maps.Map(mapContainer, mapOption);
+    map.setCenter(new kakao.maps.LatLng(SUYU.lat, SUYU.lng));
+    map.setLevel(4);
 
     var panel       = document.getElementById("panel");
     var btnLoc      = document.getElementById("btn-loc");
@@ -214,7 +216,7 @@
     var subwayOverlays = [];
     var busOverlays    = [];
     var locOverlay     = null;
-    var myLat = CENTER.lat, myLng = CENTER.lng;
+    var myLat = SUYU.lat, myLng = SUYU.lng;
     var searchTimer = null;
     var signalState = [];
     var isPanelOpen = true;
@@ -315,7 +317,6 @@
         var name        = row.ITRSC_NM || "횡단보도";
         var lat         = parseFloat(row.LAT);
         var lng         = parseFloat(row.LNG);
-
         if (isNaN(lat) || isNaN(lng)) return;
 
         signalState.push({ name: name, sec: sec, isGreen: isGreen, isSimulated: isSimulated });
@@ -360,14 +361,23 @@
         var r = await fetch(BASE + "/api/signal?lat=" + lat + "&lng=" + lng);
         if (!r.ok) throw new Error();
         var d = await r.json();
-        if (!d || !d.SptTrafficLghtResidTime || !d.SptTrafficLghtResidTime.row || !d.SptTrafficLghtResidTime.row.length) throw new Error();
+        if (!d || !d.SptTrafficLghtResidTime || !d.SptTrafficLghtResidTime.row) throw new Error();
         var rows = d.SptTrafficLghtResidTime.row;
-        var locChanged = !lastLat || Math.abs(lat - lastLat) > 0.003 || Math.abs(lng - lastLng) > 0.003;
-        if (locChanged) {
-          drawSignalMarkers(rows);
+
+        if (!rows.length) {
+          sigOverlays.forEach(function(o) { o.setMap(null); });
+          sigOverlays = [];
+          signalState = [];
+          signalList.innerHTML = '<div style="color:#555;font-size:12px;padding:4px">이 지역 신호등 정보 없음</div>';
           lastLat = lat; lastLng = lng;
         } else {
-          updateSignalData(rows);
+          var locChanged = !lastLat || Math.abs(lat - lastLat) > 0.003 || Math.abs(lng - lastLng) > 0.003;
+          if (locChanged) {
+            drawSignalMarkers(rows);
+            lastLat = lat; lastLng = lng;
+          } else {
+            updateSignalData(rows);
+          }
         }
       } catch(e) {
         if (!signalState.length) {
@@ -521,9 +531,8 @@
       );
     });
 
-    // 수유역으로 시작
     updateSignal();
-    updateWeather(CENTER.lat, CENTER.lng);
+    updateWeather(SUYU.lat, SUYU.lng);
     loadNearbySubway();
     loadNearbyBusStops();
   </script>
