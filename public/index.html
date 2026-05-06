@@ -33,6 +33,23 @@
     }
     .btn-location.panel-open { bottom: 300px; }
     .btn-location:active { transform: scale(0.92); }
+
+    /* 신호등 마커 */
+    .signal-bubble {
+      background: #1a1a1a; border: 2px solid #333;
+      border-radius: 14px; padding: 6px 10px;
+      text-align: center; min-width: 58px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+      cursor: pointer;
+    }
+    .signal-bubble.green { border-color: #00e676; }
+    .signal-bubble.red   { border-color: #ff1744; }
+    .signal-bubble .s-emoji { font-size: 16px; display: block; margin-bottom: 2px; }
+    .signal-bubble .s-sec  { font-size: 18px; font-weight: 900; color: #fff; line-height: 1; }
+    .signal-bubble.green .s-sec { color: #00e676; }
+    .signal-bubble.red   .s-sec { color: #ff1744; }
+    .signal-bubble .s-label { font-size: 8px; color: #777; margin-top: 2px; }
+
     .subway-marker {
       background: #1a1a1a; border: 2px solid #ff9800;
       border-radius: 10px; padding: 4px 8px;
@@ -179,11 +196,11 @@
 
   <script>
     var BASE   = "https://suyu-signal.onrender.com";
-    var CENTER = { lat: 37.625395, lng: 127.037088 };
+    var CENTER = { lat: 37.648900, lng: 127.027700 };
 
     var map = new kakao.maps.Map(document.getElementById("map"), {
       center: new kakao.maps.LatLng(CENTER.lat, CENTER.lng),
-      level: 3
+      level: 4
     });
 
     var panel       = document.getElementById("panel");
@@ -197,6 +214,7 @@
     var wDesc       = document.getElementById("w-desc");
     var toastEl     = document.getElementById("toast");
 
+    var sigOverlays    = [];
     var subwayOverlays = [];
     var busOverlays    = [];
     var locOverlay     = null;
@@ -205,7 +223,6 @@
     var signalState = [];
     var isPanelOpen = true;
 
-    // ── 탭 전환 ─────────────────────────────────
     function switchTab(name, e) {
       if (e) e.stopPropagation();
       document.querySelectorAll(".tab").forEach(function(t) { t.classList.remove("active"); });
@@ -215,7 +232,6 @@
       if (!isPanelOpen) togglePanel();
     }
 
-    // ── 패널 토글 ────────────────────────────────
     function togglePanel() {
       isPanelOpen = !isPanelOpen;
       if (isPanelOpen) {
@@ -231,7 +247,6 @@
       if (e.target === this || e.target.id === "toggle-btn") togglePanel();
     });
 
-    // ── 토스트 ──────────────────────────────────
     function toast(msg, type) {
       type = type || "err";
       toastEl.textContent   = msg;
@@ -240,7 +255,6 @@
       setTimeout(function() { toastEl.style.display = "none"; }, 3500);
     }
 
-    // ── 날씨 ────────────────────────────────────
     function weatherEmoji(id) {
       if (id >= 200 && id < 300) return "⛈️";
       if (id >= 300 && id < 400) return "🌦️";
@@ -265,7 +279,12 @@
       setTimeout(function() { updateWeather(myLat, myLng); }, 600000);
     }
 
-    // ── 신호등 (지도 마커 없이 패널만) ───────────
+    // 신호등 마커
+    function clearSignalOverlays() {
+      sigOverlays.forEach(function(o) { o.setMap(null); });
+      sigOverlays = [];
+    }
+
     function updateSignalPanel() {
       if (!signalState.length) return;
       var html = "";
@@ -281,6 +300,10 @@
           + '<div class="si-time">' + now + '</div></div></div>';
       });
       signalList.innerHTML = html;
+      // 지도 마커 초 업데이트
+      document.querySelectorAll(".s-sec").forEach(function(el, i) {
+        if (signalState[i]) el.textContent = signalState[i].sec;
+      });
     }
 
     setInterval(function() {
@@ -288,28 +311,57 @@
       updateSignalPanel();
     }, 1000);
 
+    function setSignalMarkers(rows) {
+      clearSignalOverlays();
+      signalState = [];
+
+      rows.forEach(function(row, i) {
+        var sec         = Number(row.RESID_TIME);
+        var isGreen     = row.LGHT_COL_CD == "1";
+        var isSimulated = row.SIMULATED === true;
+        var c           = isGreen ? "green" : "red";
+        var e           = isGreen ? "🟢" : "🔴";
+        var name        = row.ITRSC_NM || "횡단보도";
+        var simTag      = isSimulated ? '<div class="s-sim">예측</div>' : '';
+        var lat         = parseFloat(row.LAT);
+        var lng         = parseFloat(row.LNG);
+
+        if (isNaN(lat) || isNaN(lng)) return;
+
+        signalState.push({ name: name, sec: sec, isGreen: isGreen, isSimulated: isSimulated });
+
+        var overlay = new kakao.maps.CustomOverlay({
+          position: new kakao.maps.LatLng(lat, lng),
+          content: '<div class="signal-bubble ' + c + '">'
+            + '<span class="s-emoji">' + e + '</span>'
+            + '<div class="s-sec">' + sec + '</div>'
+            + '<div class="s-label">초 남음</div>'
+            + simTag + '</div>',
+          yAnchor: 1.5
+        });
+        overlay.setMap(map);
+        sigOverlays.push(overlay);
+      });
+      updateSignalPanel();
+    }
+
     async function updateSignal() {
       try {
-        var r = await fetch(BASE + "/api/signal");
+        var center = map.getCenter();
+        var lat    = center.getLat();
+        var lng    = center.getLng();
+        var r = await fetch(BASE + "/api/signal?lat=" + lat + "&lng=" + lng);
         if (!r.ok) throw new Error();
         var d = await r.json();
         if (!d || !d.SptTrafficLghtResidTime || !d.SptTrafficLghtResidTime.row || !d.SptTrafficLghtResidTime.row.length) throw new Error();
-        signalState = d.SptTrafficLghtResidTime.row.map(function(row) {
-          return {
-            name:        row.ITRSC_NM || "횡단보도",
-            sec:         Number(row.RESID_TIME),
-            isGreen:     row.LGHT_COL_CD == "1",
-            isSimulated: row.SIMULATED === true
-          };
-        });
-        updateSignalPanel();
+        setSignalMarkers(d.SptTrafficLghtResidTime.row);
       } catch(e) {
         signalList.innerHTML = '<div style="color:#555;font-size:12px;padding:4px">신호 수신 불가</div>';
       }
       setTimeout(updateSignal, 3000);
     }
 
-    // ── 지하철 ──────────────────────────────────
+    // 지하철
     function cleanStationName(name) {
       return name.replace(/\s*\d+호선.*$/, "").replace(/역$/, "").trim();
     }
@@ -377,7 +429,7 @@
       }
     }
 
-    // ── 버스 ────────────────────────────────────
+    // 버스
     function clearBusOverlays() {
       busOverlays.forEach(function(o) { o.setMap(null); });
       busOverlays = [];
@@ -410,6 +462,7 @@
     kakao.maps.event.addListener(map, "dragend", function() {
       clearTimeout(searchTimer);
       searchTimer = setTimeout(function() {
+        updateSignal();
         loadNearbySubway();
         loadNearbyBusStops();
       }, 500);
@@ -417,12 +470,12 @@
     kakao.maps.event.addListener(map, "zoom_changed", function() {
       clearTimeout(searchTimer);
       searchTimer = setTimeout(function() {
+        updateSignal();
         loadNearbySubway();
         loadNearbyBusStops();
       }, 500);
     });
 
-    // ── 현재위치 ────────────────────────────────
     function setMyLocation(lat, lng) {
       myLat = lat; myLng = lng;
       if (locOverlay) locOverlay.setMap(null);
@@ -443,8 +496,9 @@
           var lng = pos.coords.longitude;
           setMyLocation(lat, lng);
           map.setCenter(new kakao.maps.LatLng(lat, lng));
-          map.setLevel(3);
+          map.setLevel(4);
           updateWeather(lat, lng);
+          updateSignal();
           loadNearbySubway();
           loadNearbyBusStops();
           toast("📍 현재 위치로 이동", "info");
