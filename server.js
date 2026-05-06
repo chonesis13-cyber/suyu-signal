@@ -9,17 +9,16 @@ const app  = express();
 const PORT = process.env.PORT || 3000;
 
 const SEOUL_KEY   = "58456c6f4d61737435384d664d5943";
+const TDATA_KEY   = "ed415d5d-ad1c-47dd-b699-f31ddf4dd45a";
 const SUBWAY_KEY  = "507057584e6173743130355570556445";
 const KAKAO_REST  = "b9430d7f52d1000a6038b7eb6402cccc";
 const WEATHER_KEY = "af228254ffa0eb85c2d1ffced047cb05";
 
-// 횡단보도 두 곳 설정
 const CROSSINGS = [
   { name: "오현로20길 교차로 A", lat: "37.625428", lng: "127.037069" },
   { name: "오현로20길 교차로 B", lat: "37.625226", lng: "127.037151" }
 ];
 
-// 신호 시뮬레이션
 function getSignalData() {
   const CYCLE      = 90;
   const GREEN_SEC  = 30;
@@ -29,41 +28,52 @@ function getSignalData() {
 
   const aIsGreen   = elapsed < GREEN_SEC;
   const aResid     = aIsGreen ? GREEN_SEC - elapsed : CYCLE - elapsed;
-
   const bElapsed   = (elapsed + RED_SEC) % CYCLE;
   const bIsGreen   = bElapsed < GREEN_SEC;
   const bResid     = Math.max(1, bIsGreen ? GREEN_SEC - bElapsed : CYCLE - bElapsed);
 
   return [
-    {
-      ITRSC_NM: CROSSINGS[0].name,
-      LGHT_COL_CD: aIsGreen ? "1" : "2",
-      RESID_TIME: aResid,
-      LAT: "", LNG: "", SIMULATED: true
-    },
-    {
-      ITRSC_NM: CROSSINGS[1].name,
-      LGHT_COL_CD: bIsGreen ? "1" : "2",
-      RESID_TIME: bResid,
-      LAT: "", LNG: "", SIMULATED: true
-    }
+    { ITRSC_NM: CROSSINGS[0].name, LGHT_COL_CD: aIsGreen ? "1" : "2", RESID_TIME: aResid, LAT: "", LNG: "", SIMULATED: true },
+    { ITRSC_NM: CROSSINGS[1].name, LGHT_COL_CD: bIsGreen ? "1" : "2", RESID_TIME: bResid, LAT: "", LNG: "", SIMULATED: true }
   ];
 }
 
 app.use(cors({ origin: "*" }));
 
-// 신호등 API
+// T-Data 신호등 실시간 API
 app.get("/api/signal", async (req, res) => {
   if (!fetch) return res.status(503).json({ error: "서버 초기화 중" });
+
+  // T-Data 실시간 먼저 시도
   try {
-    const r = await fetch(
-      `http://openAPI.seoul.go.kr:8088/${SEOUL_KEY}/json/SptTrafficLghtResidTime/1/5/`,
-      { timeout: 3000 }
-    );
+    const url = `http://t-data.seoul.go.kr/apig/apiman-gateway/tapi/v2xSignalPhaseTimingInformation/1.0?apiKey=${TDATA_KEY}`;
+    const r = await fetch(url, { timeout: 5000 });
     const d = await r.json();
-    if (!d.RESULT) return res.json(d);
+    if (d && d.length > 0) {
+      // T-Data 데이터를 기존 형식으로 변환
+      const rows = d.slice(0, 5).map(function(item) {
+        const isGreen = item.ntBssgRmdrCs > 0;
+        const residTime = isGreen ? item.ntBssgRmdrCs : item.stBssgRmdrCs;
+        return {
+          ITRSC_NM: item.itstId || "교차로",
+          LGHT_COL_CD: isGreen ? "1" : "2",
+          RESID_TIME: residTime || 30,
+          LAT: "",
+          LNG: "",
+          SIMULATED: false
+        };
+      });
+      return res.json({
+        SptTrafficLghtResidTime: {
+          list_total_count: rows.length,
+          RESULT: { CODE: "INFO-000", MESSAGE: "정상 처리되었습니다" },
+          row: rows
+        }
+      });
+    }
   } catch (e) {}
 
+  // 실패시 시뮬레이션
   res.json({
     SptTrafficLghtResidTime: {
       list_total_count: 2,
@@ -71,6 +81,19 @@ app.get("/api/signal", async (req, res) => {
       row: getSignalData()
     }
   });
+});
+
+// T-Data 신호등 원본 데이터
+app.get("/api/signal/raw", async (req, res) => {
+  if (!fetch) return res.status(503).json({ error: "서버 초기화 중" });
+  try {
+    const url = `http://t-data.seoul.go.kr/apig/apiman-gateway/tapi/v2xSignalPhaseTimingInformation/1.0?apiKey=${TDATA_KEY}`;
+    const r = await fetch(url, { timeout: 5000 });
+    const d = await r.json();
+    res.json(d);
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
 });
 
 // 지하철 실시간 도착정보
