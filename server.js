@@ -92,8 +92,8 @@ app.use(cors({ origin: "*" }));
 
 app.get("/api/signal", async (req, res) => {
   if (!fetch) return res.status(503).json({ error: "서버 초기화 중" });
-  var lat = parseFloat(req.query.lat) || 37.648900;
-  var lng = parseFloat(req.query.lng) || 127.027700;
+  var lat = parseFloat(req.query.lat) || 37.6380;
+var lng = parseFloat(req.query.lng) || 127.0255;
 
   var nearby = SIGNAL_LOCATIONS.filter(function(s) {
     return distance(lat, lng, s.lat, s.lng) < 300;
