@@ -65,7 +65,7 @@ function parseTDataSignal(items) {
     var residTime = isGreen ? Math.round(greenTime / 10) : (redTime ? Math.round(redTime / 10) : 30);
 
     rows.push({
-      ITRSC_NM:    item.eqmnId || item.dataId || "교차로",
+      ITRSC_NM: "교차로 " + (item.eqmnId || item.dataId || "").slice(-4),
       LGHT_COL_CD: isGreen ? "1" : "2",
       RESID_TIME:  residTime,
       LAT:         "",
