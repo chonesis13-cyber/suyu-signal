@@ -191,15 +191,14 @@
   <div class="toast" id="toast"></div>
 
   <script>
-    var BASE   = "https://suyu-signal.onrender.com";
-    var SUYU   = { lat: 37.648900, lng: 127.027700 }; // 수유역
+    var BASE = "https://suyu-signal.onrender.com";
+    var SUYU = { lat: 37.648900, lng: 127.027700 };
 
-    // 카카오맵 초기화 후 강제로 수유역으로 이동
-    var mapContainer = document.getElementById("map");
-    var mapOption = { center: new kakao.maps.LatLng(SUYU.lat, SUYU.lng), level: 4 };
-    var map = new kakao.maps.Map(mapContainer, mapOption);
+    var map = new kakao.maps.Map(document.getElementById("map"), {
+      center: new kakao.maps.LatLng(SUYU.lat, SUYU.lng),
+      level: 4
+    });
     map.setCenter(new kakao.maps.LatLng(SUYU.lat, SUYU.lng));
-    map.setLevel(4);
 
     var panel       = document.getElementById("panel");
     var btnLoc      = document.getElementById("btn-loc");
@@ -217,10 +216,14 @@
     var busOverlays    = [];
     var locOverlay     = null;
     var myLat = SUYU.lat, myLng = SUYU.lng;
-    var searchTimer = null;
-    var signalState = [];
-    var isPanelOpen = true;
-    var lastLat = null, lastLng = null;
+    var searchTimer    = null;
+    var isPanelOpen    = true;
+    var lastLat        = null;
+    var lastLng        = null;
+
+    // 신호 상태 (마커와 별도로 관리)
+    var signalState = []; // { name, isGreen, sec, isSimulated }
+    var signalMarkers = []; // { overlay, isGreen }
 
     function switchTab(name, e) {
       if (e) e.stopPropagation();
@@ -278,7 +281,8 @@
       setTimeout(function() { updateWeather(myLat, myLng); }, 600000);
     }
 
-    function updateSignalPanel() {
+    // 패널만 업데이트 (마커는 건드리지 않음)
+    function renderSignalPanel() {
       if (!signalState.length) return;
       var html = "";
       signalState.forEach(function(s) {
@@ -293,16 +297,29 @@
           + '<div class="si-time">' + now + '</div></div></div>';
       });
       signalList.innerHTML = html;
-      document.querySelectorAll(".s-sec").forEach(function(el, i) {
-        if (signalState[i]) el.textContent = signalState[i].sec;
-      });
     }
 
+    // 1초마다 카운트다운 (마커 내부 숫자도 업데이트)
     setInterval(function() {
-      signalState.forEach(function(s) { if (s.sec > 1) s.sec--; });
-      updateSignalPanel();
+      signalState.forEach(function(s, i) {
+        if (s.sec > 1) s.sec--;
+        // 마커 내부 숫자 업데이트
+        if (sigOverlays[i]) {
+          var el = sigOverlays[i].getContent();
+          if (typeof el === "string") {
+            var c = s.isGreen ? "green" : "red";
+            var e = s.isGreen ? "🟢" : "🔴";
+            sigOverlays[i].setContent('<div class="signal-bubble ' + c + '">'
+              + '<span class="s-emoji">' + e + '</span>'
+              + '<div class="s-sec">' + s.sec + '</div>'
+              + '<div class="s-label">초 남음</div></div>');
+          }
+        }
+      });
+      renderSignalPanel();
     }, 1000);
 
+    // 마커 새로 그리기
     function drawSignalMarkers(rows) {
       sigOverlays.forEach(function(o) { o.setMap(null); });
       sigOverlays = [];
@@ -332,25 +349,21 @@
         overlay.setMap(map);
         sigOverlays.push(overlay);
       });
-      updateSignalPanel();
+      renderSignalPanel();
     }
 
-    function updateSignalData(rows) {
+    // 신호 색상만 업데이트 (초는 건드리지 않음)
+    function updateSignalColor(rows) {
       rows.forEach(function(row, i) {
         if (!signalState[i]) return;
-        signalState[i].sec     = Number(row.RESID_TIME);
-        signalState[i].isGreen = row.LGHT_COL_CD == "1";
-        var overlay = sigOverlays[i];
-        if (overlay) {
-          var c = signalState[i].isGreen ? "green" : "red";
-          var e = signalState[i].isGreen ? "🟢" : "🔴";
-          overlay.setContent('<div class="signal-bubble ' + c + '">'
-            + '<span class="s-emoji">' + e + '</span>'
-            + '<div class="s-sec">' + signalState[i].sec + '</div>'
-            + '<div class="s-label">초 남음</div></div>');
+        var newGreen = row.LGHT_COL_CD == "1";
+        // 색상이 바뀐 경우에만 초 리셋
+        if (signalState[i].isGreen !== newGreen) {
+          signalState[i].isGreen = newGreen;
+          signalState[i].sec     = Number(row.RESID_TIME);
         }
       });
-      updateSignalPanel();
+      renderSignalPanel();
     }
 
     async function updateSignal() {
@@ -361,8 +374,8 @@
         var r = await fetch(BASE + "/api/signal?lat=" + lat + "&lng=" + lng);
         if (!r.ok) throw new Error();
         var d = await r.json();
-        if (!d || !d.SptTrafficLghtResidTime || !d.SptTrafficLghtResidTime.row) throw new Error();
-        var rows = d.SptTrafficLghtResidTime.row;
+        if (!d || !d.SptTrafficLghtResidTime) throw new Error();
+        var rows = d.SptTrafficLghtResidTime.row || [];
 
         if (!rows.length) {
           sigOverlays.forEach(function(o) { o.setMap(null); });
@@ -376,7 +389,7 @@
             drawSignalMarkers(rows);
             lastLat = lat; lastLng = lng;
           } else {
-            updateSignalData(rows);
+            updateSignalColor(rows);
           }
         }
       } catch(e) {
@@ -387,6 +400,7 @@
       setTimeout(updateSignal, 5000);
     }
 
+    // 지하철
     function cleanStationName(name) {
       return name.replace(/\s*\d+호선.*$/, "").replace(/역$/, "").trim();
     }
@@ -454,6 +468,7 @@
       }
     }
 
+    // 버스
     function clearBusOverlays() {
       busOverlays.forEach(function(o) { o.setMap(null); });
       busOverlays = [];
