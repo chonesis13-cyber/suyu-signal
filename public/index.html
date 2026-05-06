@@ -33,14 +33,11 @@
     }
     .btn-location.panel-open { bottom: 300px; }
     .btn-location:active { transform: scale(0.92); }
-
-    /* 신호등 마커 */
     .signal-bubble {
       background: #1a1a1a; border: 2px solid #333;
       border-radius: 14px; padding: 6px 10px;
       text-align: center; min-width: 58px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.6);
-      cursor: pointer;
     }
     .signal-bubble.green { border-color: #00e676; }
     .signal-bubble.red   { border-color: #ff1744; }
@@ -49,7 +46,6 @@
     .signal-bubble.green .s-sec { color: #00e676; }
     .signal-bubble.red   .s-sec { color: #ff1744; }
     .signal-bubble .s-label { font-size: 8px; color: #777; margin-top: 2px; }
-
     .subway-marker {
       background: #1a1a1a; border: 2px solid #ff9800;
       border-radius: 10px; padding: 4px 8px;
@@ -222,6 +218,7 @@
     var searchTimer = null;
     var signalState = [];
     var isPanelOpen = true;
+    var signalLoaded = false; // 마커 최초 로드 여부
 
     function switchTab(name, e) {
       if (e) e.stopPropagation();
@@ -279,12 +276,7 @@
       setTimeout(function() { updateWeather(myLat, myLng); }, 600000);
     }
 
-    // 신호등 마커
-    function clearSignalOverlays() {
-      sigOverlays.forEach(function(o) { o.setMap(null); });
-      sigOverlays = [];
-    }
-
+    // 신호등 패널만 업데이트 (마커는 건드리지 않음)
     function updateSignalPanel() {
       if (!signalState.length) return;
       var html = "";
@@ -300,29 +292,31 @@
           + '<div class="si-time">' + now + '</div></div></div>';
       });
       signalList.innerHTML = html;
-      // 지도 마커 초 업데이트
+      // 지도 마커 초만 업데이트
       document.querySelectorAll(".s-sec").forEach(function(el, i) {
         if (signalState[i]) el.textContent = signalState[i].sec;
       });
     }
 
+    // 1초 카운트다운
     setInterval(function() {
       signalState.forEach(function(s) { if (s.sec > 1) s.sec--; });
       updateSignalPanel();
     }, 1000);
 
-    function setSignalMarkers(rows) {
-      clearSignalOverlays();
+    // 마커 새로 그리기 (처음 또는 지역 변경시에만)
+    function drawSignalMarkers(rows) {
+      sigOverlays.forEach(function(o) { o.setMap(null); });
+      sigOverlays = [];
       signalState = [];
 
-      rows.forEach(function(row, i) {
+      rows.forEach(function(row) {
         var sec         = Number(row.RESID_TIME);
         var isGreen     = row.LGHT_COL_CD == "1";
         var isSimulated = row.SIMULATED === true;
         var c           = isGreen ? "green" : "red";
         var e           = isGreen ? "🟢" : "🔴";
         var name        = row.ITRSC_NM || "횡단보도";
-        var simTag      = isSimulated ? '<div class="s-sim">예측</div>' : '';
         var lat         = parseFloat(row.LAT);
         var lng         = parseFloat(row.LNG);
 
@@ -335,8 +329,7 @@
           content: '<div class="signal-bubble ' + c + '">'
             + '<span class="s-emoji">' + e + '</span>'
             + '<div class="s-sec">' + sec + '</div>'
-            + '<div class="s-label">초 남음</div>'
-            + simTag + '</div>',
+            + '<div class="s-label">초 남음</div></div>',
           yAnchor: 1.5
         });
         overlay.setMap(map);
@@ -344,6 +337,29 @@
       });
       updateSignalPanel();
     }
+
+    // 신호 데이터만 업데이트 (마커 위치는 유지, 색상/시간만 변경)
+    function updateSignalData(rows) {
+      rows.forEach(function(row, i) {
+        if (!signalState[i]) return;
+        signalState[i].sec     = Number(row.RESID_TIME);
+        signalState[i].isGreen = row.LGHT_COL_CD == "1";
+
+        // 마커 색상 업데이트
+        var overlay = sigOverlays[i];
+        if (overlay) {
+          var c = signalState[i].isGreen ? "green" : "red";
+          var e = signalState[i].isGreen ? "🟢" : "🔴";
+          overlay.setContent('<div class="signal-bubble ' + c + '">'
+            + '<span class="s-emoji">' + e + '</span>'
+            + '<div class="s-sec">' + signalState[i].sec + '</div>'
+            + '<div class="s-label">초 남음</div></div>');
+        }
+      });
+      updateSignalPanel();
+    }
+
+    var lastLat = null, lastLng = null;
 
     async function updateSignal() {
       try {
@@ -354,11 +370,24 @@
         if (!r.ok) throw new Error();
         var d = await r.json();
         if (!d || !d.SptTrafficLghtResidTime || !d.SptTrafficLghtResidTime.row || !d.SptTrafficLghtResidTime.row.length) throw new Error();
-        setSignalMarkers(d.SptTrafficLghtResidTime.row);
+
+        var rows = d.SptTrafficLghtResidTime.row;
+
+        // 위치가 크게 바뀌거나 처음 로드시 마커 새로 그리기
+        var locChanged = !lastLat || Math.abs(lat - lastLat) > 0.003 || Math.abs(lng - lastLng) > 0.003;
+        if (locChanged) {
+          drawSignalMarkers(rows);
+          lastLat = lat;
+          lastLng = lng;
+        } else {
+          updateSignalData(rows);
+        }
       } catch(e) {
-        signalList.innerHTML = '<div style="color:#555;font-size:12px;padding:4px">신호 수신 불가</div>';
+        if (!signalState.length) {
+          signalList.innerHTML = '<div style="color:#555;font-size:12px;padding:4px">신호 수신 불가</div>';
+        }
       }
-      setTimeout(updateSignal, 3000);
+      setTimeout(updateSignal, 5000);
     }
 
     // 지하철
