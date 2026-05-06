@@ -72,7 +72,6 @@ function dirToName(dir) {
 function parseTData(items) {
   var bssgFields = ["ntBssgRmdrCs","stBssgRmdrCs","etBssgRmdrCs","wtBssgRmdrCs","seBssgRmdrCs","swBssgRmdrCs","neBssgRmdrCs","nwBssgRmdrCs"];
   var stsgFields = ["ntStsgRmdrCs","stStsgRmdrCs","etStsgRmdrCs","wtStsgRmdrCs","seStsgRmdrCs","swStsgRmdrCs","neStsgRmdrCs","nwStsgRmdrCs"];
-
   return items.map(function(item) {
     var greenTime = null, redTime = null;
     for (var a = 0; a < bssgFields.length; a++) {
@@ -93,11 +92,9 @@ app.use(cors({ origin: "*" }));
 
 app.get("/api/signal", async (req, res) => {
   if (!fetch) return res.status(503).json({ error: "서버 초기화 중" });
-
   var lat = parseFloat(req.query.lat) || 37.648900;
   var lng = parseFloat(req.query.lng) || 127.027700;
 
-  // 반경 300m 안 신호등 최대 4개만
   var nearby = SIGNAL_LOCATIONS.filter(function(s) {
     return distance(lat, lng, s.lat, s.lng) < 300;
   }).slice(0, 4);
@@ -116,7 +113,6 @@ app.get("/api/signal", async (req, res) => {
     var url = "http://t-data.seoul.go.kr/apig/apiman-gateway/tapi/v2xSignalPhaseTimingInformation/1.0?apiKey=" + TDATA_KEY;
     var r   = await fetch(url, { timeout: 5000 });
     var d   = await r.json();
-
     if (Array.isArray(d) && d.length > 0) {
       var signals = parseTData(d);
       var rows = nearby.map(function(loc, i) {
@@ -134,9 +130,7 @@ app.get("/api/signal", async (req, res) => {
         SptTrafficLghtResidTime: { list_total_count: rows.length, RESULT: { CODE: "INFO-000" }, row: rows }
       });
     }
-  } catch(e) {
-    console.log("T-Data 오류:", e.message);
-  }
+  } catch(e) { console.log("T-Data 오류:", e.message); }
 
   var CYCLE = 90, GREEN = 30;
   var now = Math.floor(Date.now() / 1000);
@@ -153,7 +147,6 @@ app.get("/api/signal", async (req, res) => {
       SIMULATED:   true
     };
   });
-
   res.json({
     SptTrafficLghtResidTime: { list_total_count: rows.length, RESULT: { CODE: "INFO-000" }, row: rows }
   });
@@ -165,8 +158,8 @@ app.get("/api/subway", async (req, res) => {
   if (!station) return res.status(400).json({ error: "역 이름 필요" });
   try {
     var url = "http://swopenAPI.seoul.go.kr/api/subway/" + SUBWAY_KEY + "/json/realtimeStationArrival/0/10/" + encodeURIComponent(station);
-    var r   = await fetch(url);
-    var d   = await r.json();
+    var r = await fetch(url);
+    var d = await r.json();
     res.json(d);
   } catch(e) { res.status(502).json({ error: e.message }); }
 });
@@ -177,8 +170,8 @@ app.get("/api/nearbySubway", async (req, res) => {
   if (!lat || !lng) return res.status(400).json({ error: "위치 정보 필요" });
   try {
     var url = "https://dapi.kakao.com/v2/local/search/category.json?category_group_code=SW8&x=" + lng + "&y=" + lat + "&radius=1000&size=5&sort=distance";
-    var r   = await fetch(url, { headers: { Authorization: "KakaoAK " + KAKAO_REST } });
-    var d   = await r.json();
+    var r = await fetch(url, { headers: { Authorization: "KakaoAK " + KAKAO_REST } });
+    var d = await r.json();
     res.json(d);
   } catch(e) { res.status(502).json({ error: e.message }); }
 });
@@ -189,8 +182,8 @@ app.get("/api/stations", async (req, res) => {
   if (!lat || !lng) return res.status(400).json({ error: "위치 정보 필요" });
   try {
     var url = "https://dapi.kakao.com/v2/local/search/keyword.json?query=%EB%B2%84%EC%8A%A4%EC%A0%95%EB%A5%98%EC%9E%A5&x=" + lng + "&y=" + lat + "&radius=500&size=15";
-    var r   = await fetch(url, { headers: { Authorization: "KakaoAK " + KAKAO_REST } });
-    var d   = await r.json();
+    var r = await fetch(url, { headers: { Authorization: "KakaoAK " + KAKAO_REST } });
+    var d = await r.json();
     res.json(d);
   } catch(e) { res.status(502).json({ error: e.message }); }
 });
@@ -201,11 +194,11 @@ app.get("/api/weather", async (req, res) => {
   if (!lat || !lng) return res.status(400).json({ error: "위치 정보 필요" });
   try {
     var url = "https://api.openweathermap.org/data/2.5/weather?lat=" + lat + "&lon=" + lng + "&appid=" + WEATHER_KEY + "&units=metric&lang=kr";
-    var r   = await fetch(url);
-    var d   = await r.json();
+    var r = await fetch(url);
+    var d = await r.json();
     res.json(d);
   } catch(e) { res.status(502).json({ error: e.message }); }
 });
 
 app.use(express.static(path.join(__dirname, "public")));
-app.listen(PORT, () => console.log("서버 실행 중: http://localhost:" + PORT));
+app.listen(PORT, function() { console.log("서버 실행 중: http://localhost:" + PORT); });
