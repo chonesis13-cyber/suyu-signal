@@ -46,6 +46,11 @@ const SIGNAL_LOCATIONS = [
   {"id":"25-0000011164","dir":"234","lat":37.651415,"lng":127.037338}
 ];
 
+// T-Data 캐시 (30초)
+var tdataCache = null;
+var tdataCacheTime = 0;
+var CACHE_MS = 30000;
+
 function distance(lat1, lng1, lat2, lng2) {
   var R = 6371000;
   var dLat = (lat2 - lat1) * Math.PI / 180;
@@ -88,12 +93,29 @@ function parseTData(items) {
   });
 }
 
+// T-Data 캐시 적용해서 가져오기
+async function getTData() {
+  var now = Date.now();
+  if (tdataCache && (now - tdataCacheTime) < CACHE_MS) {
+    return tdataCache;
+  }
+  var url = "http://t-data.seoul.go.kr/apig/apiman-gateway/tapi/v2xSignalPhaseTimingInformation/1.0?apiKey=" + TDATA_KEY;
+  var r   = await fetch(url, { timeout: 5000 });
+  var d   = await r.json();
+  if (Array.isArray(d) && d.length > 0) {
+    tdataCache     = d;
+    tdataCacheTime = now;
+    return d;
+  }
+  return null;
+}
+
 app.use(cors({ origin: "*" }));
 
 app.get("/api/signal", async (req, res) => {
   if (!fetch) return res.status(503).json({ error: "서버 초기화 중" });
-  var lat = parseFloat(req.query.lat) || 37.6380;
-var lng = parseFloat(req.query.lng) || 127.0255;
+  var lat = parseFloat(req.query.lat) || 37.648900;
+  var lng = parseFloat(req.query.lng) || 127.027700;
 
   var nearby = SIGNAL_LOCATIONS.filter(function(s) {
     return distance(lat, lng, s.lat, s.lng) < 300;
@@ -110,10 +132,8 @@ var lng = parseFloat(req.query.lng) || 127.0255;
   });
 
   try {
-    var url = "http://t-data.seoul.go.kr/apig/apiman-gateway/tapi/v2xSignalPhaseTimingInformation/1.0?apiKey=" + TDATA_KEY;
-    var r   = await fetch(url, { timeout: 5000 });
-    var d   = await r.json();
-    if (Array.isArray(d) && d.length > 0) {
+    var d = await getTData();
+    if (d) {
       var signals = parseTData(d);
       var rows = nearby.map(function(loc, i) {
         var sig = signals[i % signals.length];
@@ -132,10 +152,11 @@ var lng = parseFloat(req.query.lng) || 127.0255;
     }
   } catch(e) { console.log("T-Data 오류:", e.message); }
 
+  // 시뮬레이션 폴백
   var CYCLE = 90, GREEN = 30;
-  var now = Math.floor(Date.now() / 1000);
+  var now2 = Math.floor(Date.now() / 1000);
   var rows = nearby.map(function(loc, i) {
-    var elapsed   = (now + i * 18) % CYCLE;
+    var elapsed   = (now2 + i * 18) % CYCLE;
     var isGreen   = elapsed < GREEN;
     var residTime = isGreen ? GREEN - elapsed : CYCLE - elapsed;
     return {
